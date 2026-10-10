@@ -798,6 +798,27 @@ test.describe('games', () => {
   })
 })
 
+/** A finger from 10 pixels below an element's top, `by` pixels down (or up, less than 0), quickly */
+const swipeSheet = (sheet: Locator, by: number) =>
+  sheet.evaluate(async (el, by) => {
+    // The page's own, which the tests' types (for Node) don't know
+    const { Touch, TouchEvent } = globalThis as unknown as {
+      Touch: new (init: { identifier: number; target: EventTarget; clientX: number; clientY: number }) => object
+      TouchEvent: new (type: string, init: { bubbles: boolean; cancelable: boolean; touches: object[]; changedTouches: object[] }) => Event
+    }
+    const { left, top, width } = el.getBoundingClientRect()
+    const x = left + width / 2
+    const at = (y: number) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: y })]
+    const fire = (type: string, y: number) =>
+      el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : at(y), changedTouches: at(y) }))
+    fire('touchstart', top + 10)
+    for (let step = 1; step <= 5; step++) {
+      fire('touchmove', top + 10 + (by * step) / 5)
+      await new Promise((done) => setTimeout(done, 16))
+    }
+    fire('touchend', top + 10 + by)
+  }, by)
+
 test.describe('touch', { tag: '@touch' }, () => {
   test('the menu is a tab bar and panels open as bottom sheets', async ({ page }) => {
     await openGlobe(page)
@@ -856,31 +877,11 @@ test.describe('touch', { tag: '@touch' }, () => {
 
   test("a sheet swiped down closes, a tab's or a country's", async ({ page }) => {
     await openGlobe(page)
-    /** A finger down from an element's top, `by` pixels, quickly */
-    const swipeDown = (sheet: Locator, by = 250) =>
-      sheet.evaluate(async (el, by) => {
-        // The page's own, which the tests' types (for Node) don't know
-        const { Touch, TouchEvent } = globalThis as unknown as {
-          Touch: new (init: { identifier: number; target: EventTarget; clientX: number; clientY: number }) => object
-          TouchEvent: new (type: string, init: { bubbles: boolean; cancelable: boolean; touches: object[]; changedTouches: object[] }) => Event
-        }
-        const { left, top, width } = el.getBoundingClientRect()
-        const x = left + width / 2
-        const at = (y: number) => [new Touch({ identifier: 1, target: el, clientX: x, clientY: y })]
-        const fire = (type: string, y: number) =>
-          el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : at(y), changedTouches: at(y) }))
-        fire('touchstart', top + 10)
-        for (let step = 1; step <= 5; step++) {
-          fire('touchmove', top + 10 + (by * step) / 5)
-          await new Promise((done) => setTimeout(done, 16))
-        }
-        fire('touchend', top + 10 + by)
-      }, by)
 
     await page.getByRole('button', { name: 'Visited' }).tap()
     const sheet = page.getByRole('region', { name: 'Visited', exact: true })
     await expect(sheet).toBeVisible()
-    await swipeDown(sheet)
+    await swipeSheet(sheet, 250)
     await expect(sheet).toBeHidden()
     // The globe slides back down from where the sheet pushed it: tap once it's there
     await page
@@ -892,7 +893,24 @@ test.describe('touch', { tag: '@touch' }, () => {
     const { x, y } = center(page)
     await page.touchscreen.tap(x, y)
     await expect(panel(page)).toBeVisible()
-    await swipeDown(panel(page))
+    await swipeSheet(panel(page), 250)
     await expect(panel(page)).toBeHidden()
+  })
+
+  test('a sheet swiped up goes all the way up, and swiped down, back to midway', async ({ page }) => {
+    await openGlobe(page)
+    await page.getByRole('button', { name: 'Visited' }).tap()
+    const sheet = page.getByRole('region', { name: 'Visited', exact: true })
+    await expect(sheet).toBeVisible()
+    const height = async () => (await sheet.boundingBox())!.height
+    const midway = await height()
+    const viewport = page.viewportSize()!
+    await swipeSheet(sheet, -250)
+    await expect(sheet).toHaveClass(/raised/)
+    // From just under the top bar, once it's settled
+    await expect.poll(height).toBeGreaterThan(viewport.height * 0.75)
+    await swipeSheet(sheet, 200)
+    await expect(sheet).not.toHaveClass(/raised/)
+    await expect.poll(height).toBeCloseTo(midway, 0)
   })
 })

@@ -2778,6 +2778,12 @@ code {
   .side-panel {
     max-height: 55vh;
   }
+  /* Swiped all the way up: from just under the top bar, to see more */
+  .side-panel.raised,
+  .panel.raised {
+    max-height: none;
+    height: calc(100dvh - var(--topbar-height) - var(--tab-bar-height) - 8px);
+  }
   .side-panel-body {
     gap: 12px;
   }
