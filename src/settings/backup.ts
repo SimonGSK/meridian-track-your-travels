@@ -5,6 +5,8 @@ import { BEST_SCORES_KEY, isBestScores } from '../games/useGame'
 import { DAILY_KEY, isDailyResults } from '../games/daily'
 import { FLIGHTS_KEY, isFlightList } from '../visited/useFlights'
 import { TRIP_NAMES_KEY, isTripNames } from '../visited/useTripNames'
+import { TRIPS_KEY } from '../visited/useTrips'
+import { isSavedTrips } from '../data/savedTrips'
 import { PLANS_KEY, isPlans } from '../visited/usePlans'
 import { VISITED_STORAGE_KEY, isNameList } from '../visited/useVisited'
 import { VISITED_CITIES_KEY, isCityIdList } from '../visited/useVisitedCities'
@@ -15,7 +17,7 @@ import { FRIEND_KEY, isFriendOrNone } from '../visited/friend'
 
 /**
  * Everything is saved in this browser only, so a backup is a file with all
- * of it: places, when you went and your notes, states, cities, flights, the wishlist, best scores and times, the design
+ * of it: places, when you went and your notes, states, cities, flights and trips, the wishlist, best scores and times, the design
  * and the layers. Restoring one replaces what's here, part by part checked
  * as the app checks it when loading.
  */
@@ -29,6 +31,7 @@ const SAVED: { key: string; isValid: (value: unknown) => boolean }[] = [
   { key: VISIT_NOTES_KEY, isValid: isVisitNotes },
   { key: FLIGHTS_KEY, isValid: isFlightList },
   { key: TRIP_NAMES_KEY, isValid: isTripNames },
+  { key: TRIPS_KEY, isValid: isSavedTrips },
   { key: PLANS_KEY, isValid: isPlans },
   { key: WISHLIST_KEY, isValid: isNameList },
   { key: FRIEND_KEY, isValid: isFriendOrNone },

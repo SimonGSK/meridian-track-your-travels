@@ -39,10 +39,12 @@ const MAX_RESULTS = 6
 // No spaces: aria-controls reads spaces as separators between ids
 const placesId = (continent: Continent) => `visited-in-${continent.replace(/\s+/g, '-')}`
 
-/** A small flag in front of a place's name in a list */
-export function Flag({ country }: { country: CountryFeature }) {
+/** A small flag in front of a place's name in a list; `named` where it stands for the place, with no name beside it */
+export function Flag({ country, named = false }: { country: CountryFeature; named?: boolean }) {
   const url = flagUrl(country)
-  return url ? <img className="mini-flag" src={url} alt="" /> : <span className="mini-flag" />
+  const { name } = country.properties
+  if (!url) return named ? <span className="mini-flag" role="img" aria-label={name} title={name} /> : <span className="mini-flag" />
+  return <img className="mini-flag" src={url} alt={named ? name : ''} title={named ? name : undefined} />
 }
 
 /** "Greenland", "Greenland and Faroe Islands", "A, B and C" */

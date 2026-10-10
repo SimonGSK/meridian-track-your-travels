@@ -2,18 +2,19 @@ import type { ReactNode } from 'react'
 import { CalendarIcon, FlagIcon, PlaneIcon } from '../icons'
 import Card from '../ui/Card'
 
-export type VisitedView = 'countries' | 'flights' | 'years'
+export type VisitedView = 'countries' | 'trips' | 'years'
 
 type Props = {
   view: VisitedView
   onViewChange: (view: VisitedView) => void
   /** Countries and territories visited, for the header */
   places: number
-  flights: number
+  /** Trips made */
+  trips: number
   /** Years with dated visits or flights */
   years: number
   countries: ReactNode
-  flightsPanel: ReactNode
+  tripsPanel: ReactNode
   yearsPanel: ReactNode
 }
 
@@ -23,23 +24,23 @@ type Props = {
  */
 const VIEWS: { id: VisitedView; label: string; header: string; icon: ReactNode }[] = [
   { id: 'countries', label: 'Countries', header: 'Visited atlas', icon: <FlagIcon size={18} /> },
-  { id: 'flights', label: 'Flights', header: 'Flights', icon: <PlaneIcon size={18} /> },
+  { id: 'trips', label: 'Trips', header: 'Trips', icon: <PlaneIcon size={18} /> },
   { id: 'years', label: 'Years', header: 'Years', icon: <CalendarIcon size={18} /> },
 ]
 
 const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
 
-/** The Visited tab: your countries, flights or years, switched at the top */
+/** The Visited tab: your countries, trips or years, switched at the top */
 export default function VisitedTab(props: Props) {
-  const { view, onViewChange, places, flights, years } = props
+  const { view, onViewChange, places, trips, years } = props
   const meta = {
     countries: plural(places, 'place'),
-    flights: plural(flights, 'flight'),
+    trips: plural(trips, 'trip'),
     years: plural(years, 'year'),
   }[view]
   const panel = {
     countries: props.countries,
-    flights: props.flightsPanel,
+    trips: props.tripsPanel,
     years: props.yearsPanel,
   }[view]
   const label = VIEWS.find((v) => v.id === view)!.header

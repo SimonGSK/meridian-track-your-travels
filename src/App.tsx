@@ -62,14 +62,15 @@ import { useFlights } from './visited/useFlights'
 import { useTripNames } from './visited/useTripNames'
 import { usePlans, useToday } from './visited/usePlans'
 import { isToCome, monthOf } from './data/plans'
-import FlightsPanel from './visited/FlightsPanel'
+import TripsPanel, { type TripActions } from './visited/TripsPanel'
+import { useTrips, newId } from './visited/useTrips'
 import VisitedTab, { type VisitedView } from './visited/VisitedTab'
 import YearsPanel from './visited/YearsPanel'
 import WrappedView from './visited/WrappedView'
 import { reviewOf, spotsOf, spotsOfStep, timelineOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { useTimeLapse } from './visited/useTimeLapse'
-import { routeOf, uniqueRoutes, type Route } from './data/flights'
-import { tripsOf } from './data/trips'
+import { distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
+import { journeysOf, looseOf, placeFor, titleOf, tripViewsOf, tripsFromFlights, visitsOf, type TripItem } from './data/savedTrips'
 import { regionFills, regionOutlines, regionProgress } from './visited/regionsView'
 import Tooltip from './Tooltip'
 import {
@@ -220,7 +221,36 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [hoveredCity, setHoveredCity] = useState<City | null>(null)
   const airports = useAirports()
   const { flights, add: addFlight, remove: removeFlight, setDate: setFlightDate } = useFlights(cities, airports)
-  const { nameOf: tripNameOf, setName: setTripName } = useTripNames()
+  // Names trips had before trips were made by hand: they go with them, the first time
+  const { nameOf: tripNameOf } = useTripNames()
+  const {
+    trips: savedTrips,
+    create: createTrip,
+    rename: renameTrip,
+    remove: removeTrip,
+    add: addToTrip,
+    takeOut: takeOutOfTrip,
+    move: moveInTrip,
+    redate: redateInTrips,
+    start: startTrips,
+  } = useTrips()
+  /** A visit added: a place's first date goes to its visit in a trip, which had none */
+  const addVisitDate = useCallback(
+    (name: string, date: VisitDate) => {
+      if (datesOf(name).length === 0) redateInTrips(name, null, date)
+      addVisit(name, date)
+    },
+    [datesOf, redateInTrips, addVisit],
+  )
+  /** A visit's date taken away: a place's last one leaves its visit in a trip without one */
+  const removeVisitDate = useCallback(
+    (name: string, date: VisitDate) => {
+      const dates = datesOf(name)
+      if (dates.length === 1 && dates[0] === date) redateInTrips(name, date, null)
+      removeVisit(name, date)
+    },
+    [datesOf, redateInTrips, removeVisit],
+  )
   // Visits planned, counted down to, until the day comes
   const today = useToday()
   const { plans, setPlan } = usePlans()
@@ -241,20 +271,20 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       })
       for (const { name, month } of arrived) {
         addPlace(name)
-        addVisit(name, month)
+        addVisitDate(name, month)
         setPlan(name, null)
       }
       const listed = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
       // Undone: didn't go after all
       offerUndo(`Welcome to ${listed}! In your visited atlas now`, () => {
         for (const { name, month, wasVisited, wasWished, hadVisit } of arrived) {
-          if (!hadVisit) removeVisit(name, month)
+          if (!hadVisit) removeVisitDate(name, month)
           if (!wasVisited) removeVisited(name)
           if (wasWished) addWish(name)
         }
       })
     },
-    [plans, visited, wished, datesOf, addPlace, addVisit, setPlan, removeVisit, removeVisited, addWish, offerUndo],
+    [plans, visited, wished, datesOf, addPlace, addVisitDate, setPlan, removeVisitDate, removeVisited, addWish, offerUndo],
   )
   // As the day of one comes, on opening the app or at midnight. Not in the screensaver, which only shows what's saved
   useEffect(() => {
@@ -265,8 +295,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [visitedView, setVisitedView] = useState<VisitedView>('countries')
   /** A flight or trip picked in the list, shown on the globe (and highlighted) until the view moves on */
   const [shownRoutes, setShownRoutes] = useState<Route[] | null>(null)
-  // A trip picked in the list, or one of its flights, says what it's called on the globe
-  const pickedTrip = shownRoutes ? tripNameOf(shownRoutes.map((route) => route.flight.id)) : null
 
   // The sea in the design's color, or a picture of the Earth (once loaded), its sea shining
   const imagery = useImagery(theme.imagery)
@@ -323,12 +351,34 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   /** A visit removed, its note with it */
   const removeVisitOf = (name: string, date: VisitDate) => {
     const note = noteOf(name, date)
-    removeVisit(name, date)
+    removeVisitDate(name, date)
     offerUndo(`Removed the visit to ${name} in ${formatVisitDate(date)}`, () => {
-      addVisit(name, date)
+      addVisitDate(name, date)
       if (note) setNote(name, date, note)
     })
   }
+  /** When a visit was, changed from the Trips list: its note and its place in a trip go with it */
+  const changeVisitDate = (place: string, from: VisitDate | null, to: VisitDate | null) => {
+    if (from === to) return
+    const note = from ? noteOf(place, from) : undefined
+    if (from) removeVisit(place, from)
+    if (to) addVisit(place, to)
+    if (note && to) setNote(place, to, note)
+    redateInTrips(place, from, to)
+  }
+
+  // The trips as they stand, and what's in none yet
+  const visits = useMemo(() => visitsOf(visited, datesOf), [visited, datesOf])
+  const tripViews = useMemo(() => tripViewsOf(savedTrips ?? [], visits, allRoutes), [savedTrips, visits, allRoutes])
+  const looseTravels = useMemo(() => looseOf(tripViews, visits, allRoutes), [tripViews, visits, allRoutes])
+  // The first time, trips made from the flights there were, once their airports have loaded
+  useEffect(() => {
+    if (savedTrips === null && airports) startTrips(tripsFromFlights(allRoutes, visits, tripNameOf, newId))
+  }, [savedTrips, airports, allRoutes, visits, tripNameOf, startTrips])
+  /** The trip a flight is in */
+  const tripOfFlight = (id: string) => tripViews.find((view) => view.routes.some((route) => route.flight.id === id)) ?? null
+  // A trip picked in the list, or one of its flights, says what it's called on the globe
+  const pickedTrip = shownRoutes?.length ? (tripOfFlight(shownRoutes[0].flight.id)?.trip ?? null) : null
   const removeFlightById = (id: string) => {
     if (shownRoutes?.some((route) => route.flight.id === id)) setShownRoutes(null)
     const route = allRoutes.find((r) => r.flight.id === id)
@@ -381,6 +431,44 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     },
     [flyToSee, selectCountry],
   )
+  /** Flies to see a trip's places, for one without flights */
+  const showPlaces = (items: readonly TripItem[]) => {
+    selectCountry(null)
+    flyToSee(
+      items.flatMap((item) => {
+        const place = item.kind === 'visit' ? countries.find((c) => c.properties.name === item.place) : null
+        return place ? [{ lng: place.properties.centroid[0], lat: place.properties.centroid[1], radius: place.properties.extent / 2 }] : []
+      }),
+    )
+    if (isPhone()) setView(null)
+  }
+  /** What can be done in the Trips list */
+  const tripActions: TripActions = {
+    create: createTrip,
+    rename: renameTrip,
+    remove: (id) => {
+      const view = tripViews.find((v) => v.trip.id === id)
+      offerUndo(`Removed the trip ${view ? titleOf(view) : ''}`.trim(), removeTrip(id))
+    },
+    add: addToTrip,
+    takeOut: takeOutOfTrip,
+    move: moveInTrip,
+    addPlace: (id, place, date, index) => {
+      if (!visited.has(place)) addPlace(place)
+      if (date) addVisitDate(place, date)
+      addToTrip(id, { kind: 'visit', place, date }, index)
+    },
+    addFlight: (id, from, to, date, items) => {
+      const flight = addFlight(from.code, to.code, date)
+      if (!flight) return
+      const item = { kind: 'flight' as const, flight }
+      const route = { flight: { id: flight, from: from.code, to: to.code, ...(date ? { date } : {}) }, from, to, km: distanceKm(from, to) }
+      addToTrip(id, item, placeFor(item, items, [...allRoutes, route]))
+    },
+    redateVisit: changeVisitDate,
+    redateFlight: setFlightDate,
+    removeFlight: removeFlightById,
+  }
   /** Turns the globe to a year's places and flights, as it shows just them */
   const showYear = (year: YearReview | null) => year && flyToSee(spotsOf(year))
 
@@ -664,10 +752,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       to: route.to,
       highlighted: isPicked(route),
     }))
-    const journeys = tripsOf(flown).map((trip) => ({
-      key: trip.routes[0].flight.id,
-      legs: trip.routes,
-      highlighted: trip.routes.some(isPicked),
+    const journeys = journeysOf(flown, savedTrips ?? []).map((legs) => ({
+      key: legs[0].flight.id,
+      legs,
+      highlighted: legs.some(isPicked),
     }))
     // Flights booked, dashed, on the globe as it is: each route once (dashes there and back would fill each other's
     // gaps), and not over one flown already
@@ -698,6 +786,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     settings.showFlights,
     game,
     shownRoutes,
+    savedTrips,
   ])
   useFlightLayer(globe, flightsShown.lines, flightsShown.journeys, { color: theme.flight, highlight: theme.selected })
   const cityAt = useCallback(
@@ -936,7 +1025,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         </p>
         {following ? (
           <FollowBar
-            name={tripNameOf(following.legs.map((route) => route.flight.id))?.name.trim() || null}
+            name={tripOfFlight(following.legs[0].flight.id)?.trip.name.trim() || null}
             leg={following.legs[followLeg]}
             index={followLeg}
             count={following.legs.length}
@@ -1001,7 +1090,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                 if (next === 'years') showYear(review)
               }}
               places={visited.size}
-              flights={routes.length}
+              trips={tripViews.length}
               years={years.length}
               countries={
                 <VisitedPanel
@@ -1051,19 +1140,19 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   onShowRoute={(route) => showRoutes([route])}
                 />
               }
-              flightsPanel={
-                <FlightsPanel
-                  routes={routes}
-                  upcoming={upcomingRoutes}
+              tripsPanel={
+                <TripsPanel
+                  trips={tripViews}
+                  loose={looseTravels}
+                  routes={allRoutes}
+                  flown={routes}
                   airports={airports}
-                  onAdd={addFlight}
-                  onRemove={removeFlightById}
-                  onDate={setFlightDate}
-                  onShow={(route) => showRoutes([route])}
-                  onShowTrip={showRoutes}
+                  datesOf={datesOf}
+                  actions={tripActions}
+                  onShowTrip={(trip) => (trip.routes.length ? showRoutes(trip.routes) : showPlaces(trip.items))}
+                  onShowRoute={(route) => showRoutes([route])}
+                  onShowPlace={showCountry}
                   onFollowTrip={followTrip}
-                  nameOf={tripNameOf}
-                  onName={(legs, name) => setTripName(legs, name, flights.map((f) => f.id))}
                 />
               }
             />
@@ -1180,7 +1269,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             visited.has(selected.properties.name)
               ? {
                   dates: datesOf(selected.properties.name),
-                  onAdd: (date) => addVisit(selected.properties.name, date),
+                  onAdd: (date) => addVisitDate(selected.properties.name, date),
                   onRemove: (date) => removeVisitOf(selected.properties.name, date),
                   noteOf: (date) => noteOf(selected.properties.name, date),
                   onNote: (date, note) => setNote(selected.properties.name, date, note),

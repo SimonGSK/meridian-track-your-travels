@@ -1404,13 +1404,7 @@ code {
   font-size: 13px;
 }
 
-.flight-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* A trip: its route over its flights, joined by a line */
+/* A trip: when, and its name or where it went */
 .trip {
   margin: 6px 0;
 }
@@ -1442,12 +1436,7 @@ code {
   text-transform: uppercase;
 }
 
-.trip-route {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-/* A trip's name over its stops, and the pencil to name it beside them, always there so it's found */
+/* A trip's name, and the pencil to name it beside it, always there so it's found */
 .trip-top {
   display: flex;
   align-items: flex-start;
@@ -1470,12 +1459,6 @@ code {
   overflow-wrap: anywhere;
 }
 
-.trip-stops {
-  color: var(--text-muted);
-  font-size: 13px;
-  overflow-wrap: anywhere;
-}
-
 /* The name, then the note, each a whole line */
 .trip-name-editor {
   flex-wrap: wrap;
@@ -1486,10 +1469,163 @@ code {
   flex-basis: 100%;
 }
 
-.trip-legs {
-  margin-left: 14px;
+/* A trip's name, if it has one, and the flags of where it went */
+.trip-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.trip-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Trips: each a card of its own, opened to its places and flights */
+.trip-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trip-list > .trip {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+
+.trip-list > .trip.open {
+  border-color: var(--line-strong);
+}
+
+.trip-top .note-button + .note-button {
+  margin-right: 4px;
+}
+
+.trip-body {
+  padding: 0 8px 8px;
+}
+
+/* Its places and flights in order; while one's dragged, the others slide out of its way */
+.trip-items {
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.trip-items.dragging > li {
+  transition: transform 0.15s ease;
+}
+
+.trip-item {
+  border-radius: 8px;
+}
+
+.trip-item .country-row {
+  padding: 6px 8px 6px 4px;
+}
+
+/* What a place or flight is dragged by, or moved with the arrow keys */
+.grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  cursor: grab;
+  /* A finger on it drags it, rather than scrolling the list */
+  touch-action: none;
+}
+
+.grip:hover {
+  background: var(--surface-hover);
+  color: var(--text-muted);
+}
+
+.trip-items.dragging .grip {
+  cursor: grabbing;
+}
+
+/* A flight's mark, where a place has its flag */
+.flight-mark {
+  display: grid;
+  place-items: center;
+  color: var(--blue);
+}
+
+.trip-actions {
+  gap: 14px;
+  margin-top: 6px;
   padding-left: 4px;
-  border-left: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.trip-actions .link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trip-actions .muted-action {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Making a trip, and adding a place or a flight to one */
+.trip-new,
+.trip-add {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.trip-new input,
+.trip-add input[type='search'] {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(3, 10, 18, 0.45);
+  font-size: 14px;
+}
+
+.trip-add .suggestions {
+  margin: 0;
+}
+
+.trip-add .city-chip .mini-flag {
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+
+/* Names in trips break between words only, with the room the picker and date leave */
+.trip-item .row-name {
+  overflow-wrap: break-word;
+}
+
+/* Putting something in no trip into one */
+.trip-picker {
+  flex: none;
+  max-width: 84px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* Hints and labels over the globe */

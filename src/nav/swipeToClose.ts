@@ -35,7 +35,8 @@ export function swipeToClose({ sheet, scroller, onClose, isOn }: Options) {
   }
   return {
     start(x: number, y: number, time: number, target: Node) {
-      if (!isOn()) return
+      // Not from what's dragged itself, like a grip to rearrange a list
+      if (!isOn() || (target instanceof Element && target.closest('[data-no-swipe]'))) return
       // From above what scrolls (the sheet's top), or from it scrolled to the top
       const inScroller = scroller === sheet || scroller.contains(target)
       start = { x, y, time, fromTop: !inScroller || scroller.scrollTop <= 0 }

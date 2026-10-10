@@ -230,46 +230,60 @@ test.describe('visited cities', () => {
   })
 })
 
-test.describe('flights', () => {
-  test('adding a flight between airports draws it, and it stays after reloading', async ({ page }) => {
-    const { errors } = await openGlobe(page)
+test.describe('trips', () => {
+  /** Opens the Trips list, and a new trip in it */
+  async function newTrip(page: Page, name: string) {
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
-    await page.getByRole('tab', { name: 'Flights' }).click()
-    for (const [label, query] of [['From', 'copenhagen'], ['To', 'bkk']]) {
+    await page.getByRole('tab', { name: 'Trips' }).click()
+    await page.getByRole('button', { name: 'New trip' }).click()
+    await page.getByRole('textbox', { name: 'Name of the new trip' }).fill(name)
+    await page.keyboard.press('Enter')
+  }
+  /** Adds a flight in the trip open, From and To found by what's typed */
+  async function addFlight(page: Page, from: string | null, to: string) {
+    for (const [label, query] of [['From', from], ['To', to]] as const) {
+      if (!query) continue
       await page.getByRole('searchbox', { name: label, exact: true }).fill(query)
       await page.getByRole('list', { name: `${label} airports` }).getByRole('button').first().click()
     }
     await page.getByRole('button', { name: 'Add flight' }).click()
-    const flights = page.getByRole('list', { name: 'Flights' })
-    await expect(flights).toContainText('Copenhagen → Bangkok')
+  }
+
+  test('a flight added to a trip draws it, and it stays after reloading', async ({ page }) => {
+    const { errors } = await openGlobe(page)
+    await newTrip(page, 'Bangkok')
+    await page.getByRole('button', { name: 'Flight', exact: true }).click()
+    await addFlight(page, 'copenhagen', 'bkk')
+    const trip = page.getByRole('list', { name: 'What the trip Bangkok was' })
+    await expect(trip).toContainText('Copenhagen → Bangkok')
 
     await page.reload()
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
-    await page.getByRole('tab', { name: 'Flights' }).click()
-    await expect(flights).toContainText('CPH → BKK')
-    await flights.getByRole('button', { name: /^Copenhagen → Bangkok/ }).click()
+    await page.getByRole('tab', { name: 'Trips' }).click()
+    await page.locator('.trip-header', { hasText: 'Bangkok' }).click()
+    await expect(trip).toContainText('CPH → BKK')
+    await trip.getByRole('button', { name: /^Copenhagen → Bangkok/ }).click()
     // The routes and their planes drew without complaints
     await page.waitForTimeout(1000)
     expect(errors).toEqual([])
   })
 
-  test('the flight back, added next, makes a trip, which shows on the globe', async ({ page }) => {
+  test('the flight back starts where the last landed, and a place goes between, the trip shown on the globe', async ({ page }) => {
     const { errors } = await openGlobe(page)
-    await page.getByRole('button', { name: 'Visited', exact: true }).click()
-    await page.getByRole('tab', { name: 'Flights' }).click()
-    for (const [label, query] of [['From', 'cph'], ['To', 'cdg']]) {
-      await page.getByRole('searchbox', { name: label, exact: true }).fill(query)
-      await page.getByRole('list', { name: `${label} airports` }).getByRole('button').first().click()
-    }
-    await page.getByRole('button', { name: 'Add flight' }).click()
+    await newTrip(page, 'Paris')
+    await page.getByRole('button', { name: 'Flight', exact: true }).click()
+    await addFlight(page, 'cph', 'cdg')
     // From starts in Paris, where the flight landed
-    await page.getByRole('searchbox', { name: 'To', exact: true }).fill('cph')
-    await page.getByRole('list', { name: 'To airports' }).getByRole('button').first().click()
-    await page.getByRole('button', { name: 'Add flight' }).click()
+    await addFlight(page, null, 'cph')
+    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await page.getByRole('button', { name: 'Place', exact: true }).click()
+    await page.getByRole('searchbox', { name: 'Place to add' }).fill('france')
+    await page.getByRole('list', { name: 'Places found' }).getByRole('button', { name: /^France/ }).click()
+    await page.getByRole('button', { name: 'Add place' }).click()
 
-    const trip = page.getByRole('button', { name: /^Trip · 2 flights/ })
-    await expect(trip).toContainText('Copenhagen → Paris → Copenhagen')
-    await trip.click()
+    const trip = page.getByRole('list', { name: 'What the trip Paris was' })
+    await expect(trip.getByRole('listitem')).toHaveText([/^Copenhagen → Paris/, /^France/, /^Paris → Copenhagen/])
+    await page.getByRole('button', { name: 'Show on globe' }).click()
     await page.waitForTimeout(1000)
     expect(errors).toEqual([])
   })

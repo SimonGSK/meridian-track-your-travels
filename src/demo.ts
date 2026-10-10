@@ -7,6 +7,7 @@ import { VISITED_REGIONS_KEY } from './visited/useVisitedRegions'
 import { VISIT_DATES_KEY, VISIT_NOTES_KEY } from './visited/useVisitDates'
 import { WISHLIST_KEY } from './visited/useWishlist'
 import { PLANS_KEY } from './visited/usePlans'
+import { TRIP_NAMES_KEY } from './visited/useTripNames'
 import { dayOf, monthOf } from './data/plans'
 
 /**
@@ -109,6 +110,13 @@ export const DEMO_FLIGHTS = [
   { id: 'demo-RAK', from: 'CPH', to: 'RAK' },
 ]
 
+/** Names for some of the trips, by their first flight, as trips were named before they were made by hand */
+const TRIP_NAMES = {
+  'demo-2025-04-CPH-ICN': { name: 'Seoul and Tokyo', note: 'Cherry blossom season' },
+  'demo-2024-02-CPH-BKK': { name: 'Around the world' },
+  'demo-2019-11-CPH-LIM': { name: 'South America' },
+}
+
 const BEST_SCORES = {
   'flags:easy': 9,
   'flags:medium': 7,
@@ -159,6 +167,7 @@ export function demoData(today = new Date()): Record<string, unknown> {
     [VISITED_CITIES_KEY]: DEMO_CITIES,
     [FLIGHTS_KEY]: [...DEMO_FLIGHTS, ...flights],
     [PLANS_KEY]: plans,
+    [TRIP_NAMES_KEY]: TRIP_NAMES,
     [WISHLIST_KEY]: DEMO_WISHLIST,
     [BEST_SCORES_KEY]: BEST_SCORES,
     [DAILY_KEY]: dailyResults(today),
