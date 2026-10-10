@@ -1,15 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLOSE_MS, swipeToClose } from './swipeToClose'
 
-/** A sheet 400 pixels high, its header, and a body that scrolls */
-function setup({ isOn = true } = {}) {
+/** A sheet 400 pixels high (700 all the way up, if it goes up), its header, and a body that scrolls */
+function setup({ isOn = true, raisable = false, raised = false } = {}) {
   const sheet = document.createElement('section')
   const header = document.createElement('header')
   const body = document.createElement('div')
   sheet.append(header, body)
-  Object.defineProperty(sheet, 'offsetHeight', { value: 400 })
+  Object.defineProperty(sheet, 'offsetHeight', { value: raised ? 700 : 400 })
   const onClose = vi.fn()
-  const swipe = swipeToClose({ sheet, scroller: body, onClose, isOn: () => isOn })
+  const onRaise = vi.fn()
+  const swipe = swipeToClose({
+    sheet,
+    scroller: body,
+    onClose,
+    isOn: () => isOn,
+    ...(raisable && { raisedHeight: () => 700, isRaised: () => raised, onRaise }),
+  })
   /** A finger from y 100 down to `to`, over `ms` */
   const drag = (from: Node, to: number, ms = 500, x = 0) => {
     swipe.start(0, 100, 0, from)
@@ -17,7 +24,7 @@ function setup({ isOn = true } = {}) {
     swipe.end(ms)
     return moved
   }
-  return { sheet, header, body, onClose, swipe, drag }
+  return { sheet, header, body, onClose, onRaise, swipe, drag }
 }
 
 describe('swipeToClose', () => {
@@ -69,6 +76,45 @@ describe('swipeToClose', () => {
     expect(drag(header, 130, 500, 200)).toEqual([false, false])
     vi.runAllTimers()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('goes all the way up when swiped up from midway, from its top or what scrolls in it', () => {
+    const { sheet, header, body, onRaise, swipe, drag } = setup({ raisable: true })
+    swipe.start(0, 300, 0, header)
+    expect(swipe.move(0, 200)).toBe(true)
+    expect(sheet.style.height).toBe('500px') // following the finger up
+    expect(swipe.move(0, -500)).toBe(true)
+    expect(sheet.style.height).toBe('700px') // no higher than the top
+    swipe.end(1000)
+    expect(onRaise).toHaveBeenCalledWith(true)
+    vi.runAllTimers()
+    expect(sheet.style.height).toBe('') // the stylesheet's, all the way up
+    body.scrollTop = 120
+    drag(body, -150, 100) // a flick up from what's scrolled
+    expect(onRaise).toHaveBeenCalledTimes(2)
+  })
+
+  it('springs back to midway when lifted only a little, slowly', () => {
+    const { onRaise, drag, sheet } = setup({ raisable: true })
+    drag(sheet, 50, 1000) // up 50 of the 300 to the top
+    vi.runAllTimers()
+    expect(onRaise).not.toHaveBeenCalled()
+    expect(sheet.style.height).toBe('')
+  })
+
+  it('all the way up, goes back to midway when swiped down, or closes when swiped far, and scrolls when swiped up', () => {
+    const top = setup({ raisable: true, raised: true })
+    expect(top.drag(top.header, -100)).toEqual([false, false]) // up: what's in it scrolls
+    expect(top.onRaise).not.toHaveBeenCalled()
+    top.drag(top.header, 400, 1000) // down to 400 of 700: nearer midway
+    expect(top.onRaise).toHaveBeenLastCalledWith(false)
+    vi.runAllTimers()
+    expect(top.onClose).not.toHaveBeenCalled()
+
+    const far = setup({ raisable: true, raised: true })
+    far.drag(far.header, 700, 1000) // down to nothing
+    vi.runAllTimers()
+    expect(far.onClose).toHaveBeenCalledOnce()
   })
 
   it("leaves alone what's dragged itself, like a grip to rearrange a list", () => {

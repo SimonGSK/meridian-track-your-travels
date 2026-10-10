@@ -33,11 +33,11 @@ export default function CountryPanel(props: Props) {
   const facts = factsOf(country)
   const code = isoCode ?? isoAlpha2
   const regionCount = regions?.regions && `${regions.regions.length} ${regions.label.toLowerCase()}`
-  // On phones, a sheet to swipe down to close
-  const sheet = useSwipeToClose<HTMLElement>(onClose)
+  // On phones, a sheet to swipe up all the way, or down to close
+  const { ref: sheet, raised } = useSwipeToClose<HTMLElement>(onClose)
 
   return (
-    <aside ref={sheet} className="panel country-panel" aria-labelledby="country-panel-title">
+    <aside ref={sheet} className={`panel country-panel${raised ? ' raised' : ''}`} aria-labelledby="country-panel-title">
       <span className="sheet-grabber" aria-hidden="true" />
       <header className="card-header">
         <span className="card-label">Selected {kind === 'country' ? 'country' : 'territory'}</span>
