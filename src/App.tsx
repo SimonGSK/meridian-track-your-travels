@@ -140,7 +140,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   /** The screensaver shown in the app, from Settings, to have a look: only the globe, until left */
   const [previewing, setPreviewing] = useState(false)
   // Big screens start with Explore open; phones with just the globe
-  const [view, setView] = useState<ViewId | null>(() => (compareOnOpen ? 'more' : isPhone() ? null : 'explore'))
+  // Always a tab open: Explore, its buttons in a corner, when no other is
+  const [view, setView] = useState<ViewId>(compareOnOpen ? 'more' : 'explore')
   /** The game whose setup is open in the Games tab */
   const [chosenGame, setChosenGame] = useState<GameId | null>(null)
   /** What's opened in the More tab, kept while the screensaver is previewed from it */
@@ -427,7 +428,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       selectCountry(null)
       setShownRoutes(picked)
       flyToSee(picked.flatMap(spotsOfRoute))
-      if (isPhone()) setView(null)
+      if (isPhone()) setView('explore')
     },
     [flyToSee, selectCountry],
   )
@@ -440,7 +441,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         return place ? [{ lng: place.properties.centroid[0], lat: place.properties.centroid[1], radius: place.properties.extent / 2 }] : []
       }),
     )
-    if (isPhone()) setView(null)
+    if (isPhone()) setView('explore')
   }
   /** What can be done in the Trips list */
   const tripActions: TripActions = {
@@ -486,11 +487,11 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       setShownRoutes(legs)
       setFollowLeg(0)
       setFollowing({ legs, startedAt: performance.now() / 1000, reopen: isPhone() })
-      if (isPhone()) setView(null)
+      if (isPhone()) setView('explore')
     },
     [selectCountry],
   )
-  /** At the end of the trip, or with Stop: the Flights list again, if it made way */
+  /** At the end of the trip, or with Stop: the Trips list again, if it made way */
   const finishFollowing = useCallback(() => {
     if (following?.reopen) setView('visited')
     setFollowing(null)
@@ -893,7 +894,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   }
 
   // Leaving the Games panel ends the game
-  const changeView = (next: ViewId | null) => {
+  const changeView = (next: ViewId) => {
     setFollowing(null)
     if (view === 'games' && next !== 'games') {
       quitGame()
@@ -904,11 +905,11 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     if (next === 'visited' && visitedView === 'years' && !showsGame(game)) showYear(review)
   }
 
-  // From a list in the side panel. On phones the panel covers the country panel, so close it.
+  // From a list in the side panel. On phones its sheet would cover the country's, so it makes way, back to Explore
   const showCountry = useCallback(
     (country: CountryFeature) => {
       selectCountry(country)
-      if (isPhone()) setView(null)
+      if (isPhone()) setView('explore')
     },
     [selectCountry],
   )
@@ -923,8 +924,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       else if (selected) selectCountry(null)
       else if (shownRoutes) setShownRoutes(null)
       else {
+        // Back to Explore, which is only buttons in a corner
         quitGame()
-        setView(null)
+        setMoreOpen(null)
+        setView('explore')
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -977,7 +980,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       // Previewing the screensaver: just the globe, as the screensaver shows it
       // Explore is buttons in a corner, not a sheet: the globe stays where it is
       className={
-        previewing ? 'app screensaver' : `app${view && view !== 'explore' ? ' panel-open' : ''}${selected ? ' country-open' : ''}`
+        previewing ? 'app screensaver' : `app${view !== 'explore' ? ' panel-open' : ''}${selected ? ' country-open' : ''}`
       }
       // The page behind the globe, with a glow drawn in CSS
       style={{ '--scene': theme.background } as CSSProperties}
@@ -1079,8 +1082,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
           cities={cities}
         />
       )}
-      {view && view !== 'explore' && (
-        <SidePanel title={VIEWS.find((v) => v.id === view)!.label} onClose={() => changeView(null)}>
+      {view !== 'explore' && (
+        <SidePanel title={VIEWS.find((v) => v.id === view)!.label} onClose={() => changeView('explore')}>
           {view === 'visited' && (
             <VisitedTab
               view={visitedView}
