@@ -563,7 +563,21 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
       expect(sidePanel()).toHaveAccessibleName('Visited')
       await userEvent.click(within(sidePanel()!).getByRole('button', { name: 'Close panel' }))
-      expect(sidePanel()).not.toBeInTheDocument()
+      // Back to Explore: there's always a tab
+      expect(sidePanel()).toHaveAccessibleName('Explore')
+      expect(screen.getByRole('button', { name: 'Explore' })).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('opens in Explore on a phone too, never with no tab', () => {
+      const matchMedia = window.matchMedia
+      window.matchMedia = ((query: string) => ({ matches: query.includes('max-width: 640px'), media: query })) as typeof window.matchMedia
+      try {
+        render(<App />)
+        expect(screen.getByRole('button', { name: 'Explore' })).toHaveAttribute('aria-expanded', 'true')
+        expect(screen.getByRole('button', { name: 'Search the atlas' })).toBeInTheDocument()
+      } finally {
+        window.matchMedia = matchMedia
+      }
     })
 
     it('switches between panels', async () => {
@@ -579,9 +593,9 @@ describe('App', () => {
       click(100)
       fireEvent.keyDown(window, { key: 'Escape' })
       expect(countryPanel()).not.toBeInTheDocument()
-      expect(sidePanel()).toBeInTheDocument()
+      expect(sidePanel()).toHaveAccessibleName('Visited')
       fireEvent.keyDown(window, { key: 'Escape' })
-      expect(sidePanel()).not.toBeInTheDocument()
+      expect(sidePanel()).toHaveAccessibleName('Explore')
     })
   })
 
@@ -802,7 +816,7 @@ describe('App', () => {
       await openMore('Compare with a friend')
       expect(painted().Japan).toBe(DEFAULT_THEME.wishlist)
       fireEvent.keyDown(window, { key: 'Escape' })
-      expect(sidePanel()).not.toBeInTheDocument()
+      expect(sidePanel()).toHaveAccessibleName('Explore')
       yoursShown()
     })
 
@@ -1411,7 +1425,7 @@ describe('App', () => {
         const follow = await screen.findByRole('button', { name: /^Follow the trip/ })
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
         fireEvent.click(follow)
-        expect(sidePanel()).not.toBeInTheDocument()
+        expect(sidePanel()).toHaveAccessibleName('Explore') // the sheet made way
         act(() => vi.advanceTimersByTime(60_000))
         expect(sidePanel()).toHaveAccessibleName('Visited')
         expect(screen.getByRole('tab', { name: 'Trips' })).toHaveAttribute('aria-selected', 'true')
