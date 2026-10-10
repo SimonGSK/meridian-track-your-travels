@@ -71,6 +71,16 @@ describe('swipeToClose', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
+  it("leaves alone what's dragged itself, like a grip to rearrange a list", () => {
+    const { body, onClose, drag } = setup()
+    const grip = document.createElement('button')
+    grip.dataset.noSwipe = ''
+    body.append(grip)
+    expect(drag(grip, 300)).toEqual([false, false])
+    vi.runAllTimers()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('does nothing where sheets are not swiped (not a phone)', () => {
     const { header, onClose, drag } = setup({ isOn: false })
     expect(drag(header, 300)).toEqual([false, false])

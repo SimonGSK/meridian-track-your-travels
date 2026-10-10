@@ -36,9 +36,13 @@ export function useFlights(cities: readonly City[] | null, airports: readonly Ai
     setStored(migrateFlights(stored, new Map(cities.map((c) => [c.id, c])), airports))
   }, [cities, airports, stored, setStored])
 
+  /** Adds a flight; gives its id, or null for one that goes nowhere */
   const add = useCallback(
     (from: string, to: string, date: VisitDate | null = null) => {
-      if (from !== to) setStored((prev) => [...prev, { id: newId(), from, to, ...(date ? { date } : {}) }])
+      if (from === to) return null
+      const id = newId()
+      setStored((prev) => [...prev, { id, from, to, ...(date ? { date } : {}) }])
+      return id
     },
     [setStored],
   )

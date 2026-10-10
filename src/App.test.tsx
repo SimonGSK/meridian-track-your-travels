@@ -175,6 +175,15 @@ const openLayers = async () => {
   if (!screen.queryByRole('button', { name: 'Style and layers' })) await userEvent.click(screen.getByRole('button', { name: 'Explore' }))
   await userEvent.click(screen.getByRole('button', { name: 'Style and layers' }))
 }
+/** Opens a trip in the Trips list, by what's read out for it: when, its name, and the countries of its flags */
+const openTrip = async (name: RegExp) => {
+  const header = await waitFor(() => {
+    const found = screen.getAllByRole('button', { name }).find((b) => b.classList.contains('trip-header'))
+    if (!found) throw new Error(`No trip ${name}`)
+    return found
+  })
+  await userEvent.click(header)
+}
 /** Opens one of the small cards in the More tab */
 const openMore = async (name: string) => {
   await userEvent.click(screen.getByRole('button', { name: 'More' }))
@@ -444,12 +453,12 @@ describe('App', () => {
       expect(within(sidePanel()!).queryByRole('region', { name: /Backup/ })).not.toBeInTheDocument()
     })
 
-    it('has just your countries, flights and years in the Visited tab', async () => {
+    it('has just your countries, trips and years in the Visited tab', async () => {
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
       expect(within(sidePanel()!).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual([
         'Countries',
-        'Flights',
+        'Trips',
         'Years',
       ])
     })
@@ -899,8 +908,9 @@ describe('App', () => {
       localStorage.setItem('countries-app.flights', JSON.stringify(flights))
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
-      await userEvent.click(screen.getByRole('tab', { name: 'Flights' }))
-      await userEvent.click(await screen.findByRole('button', { name: 'Remove flight from Bangkok to London' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
+      await openTrip(/Thailand United Kingdom/)
+      await userEvent.click(await screen.findByRole('button', { name: 'Remove the flight from Bangkok to London' }))
       expect(note()).toHaveTextContent('Removed the flight from Bangkok to London')
       expect(saved('flights').map((f: { id: string }) => f.id)).toEqual(['a', 'c'])
       await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
@@ -992,10 +1002,12 @@ describe('App', () => {
         )
       await waitFor(() => expect(lines()).toEqual(['a', 'upcoming-b (to come)']))
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
-      await userEvent.click(screen.getByRole('tab', { name: 'Flights' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
       expect(screen.getByText('Flights', { selector: 'dt' }).nextElementSibling).toHaveTextContent('1')
-      expect(screen.getByRole('list', { name: 'Upcoming flights' })).toHaveTextContent(/Copenhagen → Narita.*in \d+ months/)
-      expect(screen.getByRole('list', { name: 'Flights' })).not.toHaveTextContent('Narita')
+      // Its trip, first, counted down to, with the flag of where it goes
+      const [booked] = document.querySelectorAll<HTMLElement>('.trip-header')
+      expect(booked).toHaveTextContent(/^Mar \d{4} · in \d+ months$/)
+      expect(within(booked).getByRole('img', { name: 'Japan' })).toBeInTheDocument()
     })
   })
 
@@ -1331,7 +1343,7 @@ describe('App', () => {
       localStorage.setItem('countries-app.flights', JSON.stringify(flights))
     const openFlights = async () => {
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
-      await userEvent.click(screen.getByRole('tab', { name: 'Flights' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
     }
     beforeAll(() => loadAirports(), 20_000)
     beforeEach(() => flightLayer.show.mockClear())
@@ -1357,7 +1369,7 @@ describe('App', () => {
       withFlights(fly('CPH', 'DXB'), fly('DXB', 'BKK'), fly('BKK', 'CPH'), fly('LHR', 'CDG'))
       render(<App />)
       await openFlights()
-      const follow = await screen.findByRole('button', { name: /^Follow the trip/ })
+      const follow = await screen.findByRole('button', { name: /^Follow the trip United Arab Emirates → Thailand/ })
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
       try {
         const bar = () => screen.queryByRole('status', { name: 'Following a trip' })
@@ -1402,24 +1414,33 @@ describe('App', () => {
         expect(sidePanel()).not.toBeInTheDocument()
         act(() => vi.advanceTimersByTime(60_000))
         expect(sidePanel()).toHaveAccessibleName('Visited')
-        expect(screen.getByRole('tab', { name: 'Flights' })).toHaveAttribute('aria-selected', 'true')
+        expect(screen.getByRole('tab', { name: 'Trips' })).toHaveAttribute('aria-selected', 'true')
       } finally {
         vi.useRealTimers()
         window.matchMedia = matchMedia
       }
     })
 
-    it('adds a flight from the Visited tab', async () => {
+    it('makes a trip, and adds a place and a flight to it, the place after the flight that lands there', async () => {
       render(<App />)
       await openFlights()
+      await userEvent.click(screen.getByRole('button', { name: 'New trip' }))
+      await userEvent.type(screen.getByRole('textbox', { name: 'Name of the new trip' }), 'Thailand{Enter}')
+      await userEvent.click(screen.getByRole('button', { name: 'Place' }))
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Place to add' }), 'thai')
+      await userEvent.click(within(screen.getByRole('list', { name: 'Places found' })).getByRole('button', { name: /^Thailand/ }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add place' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Flight' }))
       for (const [label, query] of [['From', 'cph'], ['To', 'bkk']]) {
         await userEvent.type(await screen.findByRole('searchbox', { name: label }), query)
         await userEvent.click(within(screen.getByRole('list', { name: `${label} airports` })).getAllByRole('button')[0])
       }
       await userEvent.click(screen.getByRole('button', { name: 'Add flight' }))
-      expect(screen.getByRole('list', { name: 'Flights' })).toHaveTextContent('Copenhagen → Bangkok')
+      const items = within(screen.getByRole('list', { name: 'What the trip Thailand was' })).getAllByRole('listitem')
+      expect(items.map((li) => li.querySelector('.row-name')!.textContent)).toEqual(['Copenhagen → Bangkok', 'Thailand'])
       expect(drawn()).toEqual(['CPH-BKK'])
-      expect(screen.getByText('1 flight')).toBeInTheDocument()
+      expect(JSON.parse(localStorage.getItem('countries-app.visited')!)).toContain('Thailand')
+      expect(screen.getByText('Flights', { selector: 'dt' }).nextElementSibling).toHaveTextContent('1')
     })
 
     it('moves flights saved between cities to their airports', async () => {
@@ -1435,6 +1456,7 @@ describe('App', () => {
       withFlights(fly('CPH', 'BKK'), fly('LHR', 'CDG'))
       render(<App />)
       await openFlights()
+      await openTrip(/^Thailand$/)
       await userEvent.click(await screen.findByRole('button', { name: /^Copenhagen → Bangkok/ }))
       const [view] = globe.pointOfView.mock.calls.at(-1) as [{ lat: number; lng: number }]
       expect(view.lat).toBeGreaterThan(13.7)
@@ -1449,7 +1471,8 @@ describe('App', () => {
       withFlights(fly('CPH', 'DXB'), fly('DXB', 'BKK'), fly('BKK', 'CPH'), fly('LHR', 'CDG'))
       render(<App />)
       await openFlights()
-      await userEvent.click(await screen.findByRole('button', { name: /^Trip · 3 flights/ }))
+      await openTrip(/^United Arab Emirates Thailand$/)
+      await userEvent.click(screen.getByRole('button', { name: 'Show on globe' }))
       expect(drawn()).toEqual(['CPH-DXB!', 'DXB-BKK!', 'BKK-CPH!', 'LHR-CDG'])
       const [view] = globe.pointOfView.mock.calls.at(-1) as [{ lat: number; lng: number; altitude: number }]
       // Between Copenhagen, Dubai and Bangkok, as far out as flights to a place go, to see them all
@@ -1458,7 +1481,7 @@ describe('App', () => {
       expect(view.altitude).toBe(1.8)
 
       // Removing a leg puts the trip away
-      await userEvent.click(screen.getByRole('button', { name: 'Remove flight from Dubai to Bangkok' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Remove the flight from Dubai to Bangkok' }))
       expect(drawn()).toEqual(['CPH-DXB', 'BKK-CPH', 'LHR-CDG'])
     })
 
@@ -1474,7 +1497,8 @@ describe('App', () => {
 
       render(<App />)
       await openFlights()
-      await userEvent.click(await screen.findByRole('button', { name: /^Trip · 3 flights · .*Asia loop/ }))
+      await openTrip(/Asia loop/)
+      await userEvent.click(screen.getByRole('button', { name: 'Show on globe' }))
       const caption = () => document.querySelector('.globe-caption')
       expect(caption()).toHaveTextContent('Asia loopMonsoon')
       // One of its flights says it too

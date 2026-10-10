@@ -10,10 +10,10 @@ describe('VisitedTab', () => {
         view={view}
         onViewChange={onViewChange}
         places={5}
-        flights={1}
+        trips={1}
         years={4}
         countries={<p>the countries</p>}
-        flightsPanel={<p>the flights</p>}
+        tripsPanel={<p>the trips</p>}
         yearsPanel={<p>the years</p>}
       />,
     )
@@ -25,10 +25,10 @@ describe('VisitedTab', () => {
     expect(screen.getByText('5 places')).toBeInTheDocument()
   })
 
-  it('shows your flights, counting them', () => {
-    show('flights')
-    expect(screen.getByRole('tabpanel', { name: 'Flights' })).toHaveTextContent('the flights')
-    expect(screen.getByText('1 flight')).toBeInTheDocument()
+  it('shows your trips, counting them', () => {
+    show('trips')
+    expect(screen.getByRole('tabpanel', { name: 'Trips' })).toHaveTextContent('the trips')
+    expect(screen.getByText('1 trip')).toBeInTheDocument()
   })
 
   it('shows your years, counting those with dates', () => {
@@ -42,7 +42,7 @@ describe('VisitedTab', () => {
     const tabs = screen.getAllByRole('tab')
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual([
       'Countries',
-      'Flights',
+      'Trips',
       'Years',
     ])
     for (const tab of tabs) {
@@ -55,7 +55,7 @@ describe('VisitedTab', () => {
   it('switches between them', async () => {
     const onViewChange = vi.fn()
     show('countries', onViewChange)
-    await userEvent.click(screen.getByRole('tab', { name: 'Flights' }))
-    expect(onViewChange).toHaveBeenCalledWith('flights')
+    await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
+    expect(onViewChange).toHaveBeenCalledWith('trips')
   })
 })

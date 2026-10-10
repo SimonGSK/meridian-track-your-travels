@@ -190,3 +190,14 @@ export const MoreIcon = ({ size = 24 }: Props) =>
       <circle cx="19" cy="12" r="1.2" fill="currentColor" />
     </>,
   )
+
+/** Six dots, to drag something by */
+export const GripIcon = ({ size = 16 }: Props) =>
+  svg(
+    size,
+    <>
+      {[8, 16].flatMap((x) =>
+        [6, 12, 18].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.3" fill="currentColor" stroke="none" />),
+      )}
+    </>,
+  )
