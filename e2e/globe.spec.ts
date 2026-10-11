@@ -157,6 +157,11 @@ test.describe('visited', () => {
     await page.getByRole('button', { name: 'Europe', exact: true }).click()
     await expect(list).toContainText('Denmark')
     await expect(page.getByLabel('Your atlas')).toContainText('1 / 197')
+
+    // One not been to yet, marked there, moves up to those visited
+    await page.getByRole('list', { name: 'Not yet in Europe' }).getByRole('button', { name: 'Mark Norway as visited' }).click()
+    await expect(list).toContainText('Norway')
+    await expect(page.getByRole('dialog', { name: 'Europe' })).toContainText('2 / 46')
   })
 
   test('marking the clicked country as visited', async ({ page }) => {

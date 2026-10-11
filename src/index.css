@@ -1526,6 +1526,10 @@ code {
   opacity: 0.55;
 }
 
+.icon-button.mark-visited:hover {
+  color: var(--accent);
+}
+
 /* A visit's trip, under its date in the country's panel */
 .visit-trip {
   display: inline-flex;
