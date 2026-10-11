@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
+import { useState, type ComponentProps } from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Airport } from '../data/airports'
 import type { Route } from '../data/flights'
-import { looseOf, tripViewsOf, type SavedTrip, type TripItem, type Visit } from '../data/savedTrips'
+import { looseOf, tripViewsOf, type SavedTrip, type TripItem } from '../data/savedTrips'
 import type { VisitDate } from '../data/visitDates'
 import TripsPanel, { type TripActions } from './TripsPanel'
 
@@ -20,13 +21,8 @@ const route = (id: string, from: Airport, to: Airport, date?: VisitDate, km = 10
   km,
 })
 const ROUTES = [route('a', CPH, NRT, '2024-04', 8700), route('b', NRT, ICN, '2024-04', 1200), route('l', CPH, LIM, '2019-11', 10_000)]
-const DATES: Record<string, VisitDate[]> = { Japan: ['2024-04'], 'South Korea': ['2024-04'], Peru: ['2019-11'] }
-const VISITS: Visit[] = [
-  { place: 'Japan', date: '2024-04' },
-  { place: 'South Korea', date: '2024-04' },
-  { place: 'Peru', date: '2019-11' },
-  { place: 'Denmark', date: null },
-]
+/** Marked visited by hand */
+const MARKED = ['Japan', 'South Korea', 'Peru', 'Denmark']
 const TRIPS: SavedTrip[] = [
   {
     id: 'asia',
@@ -56,22 +52,28 @@ function setup() {
     redateFlight: vi.fn(),
     removeFlight: vi.fn(),
   }
-  const views = tripViewsOf(TRIPS, VISITS, ROUTES)
+  const views = tripViewsOf(TRIPS, ROUTES)
   const props = {
     trips: views,
-    loose: looseOf(views, VISITS, ROUTES),
+    loose: looseOf(views, MARKED, ROUTES),
     routes: ROUTES,
     flown: ROUTES,
     airports: AIRPORTS,
-    datesOf: (place: string) => DATES[place] ?? [],
     actions: actions as unknown as TripActions,
     onShowTrip: vi.fn(),
     onShowRoute: vi.fn(),
     onShowPlace: vi.fn(),
     onFollowTrip: vi.fn(),
+    onReplay: vi.fn(),
   }
-  render(<TripsPanel {...props} />)
+  render(<Panel {...props} />)
   return { ...props, actions }
+}
+
+/** The panel, keeping which trip is open as the app does */
+function Panel(props: Omit<ComponentProps<typeof TripsPanel>, 'open' | 'onOpen'>) {
+  const [open, setOpen] = useState<string | null>(null)
+  return <TripsPanel {...props} open={open} onOpen={setOpen} />
 }
 
 /** The trips' headers, which open them */
@@ -95,15 +97,14 @@ describe('TripsPanel', () => {
   })
 
   it('shows just the flags and when for a trip without a name', () => {
-    const views = tripViewsOf([{ id: 'x', name: '', items: [{ kind: 'flight', flight: 'l' }, { kind: 'visit', place: 'Peru', date: '2019-11' }] }], VISITS, ROUTES)
+    const views = tripViewsOf([{ id: 'x', name: '', items: [{ kind: 'flight', flight: 'l' }, { kind: 'visit', place: 'Peru', date: '2019-11' }] }], ROUTES)
     render(
-      <TripsPanel
+      <Panel
         trips={views}
-        loose={{ visits: [], flights: [] }}
+        loose={{ places: [], flights: [] }}
         routes={ROUTES}
         flown={ROUTES}
         airports={AIRPORTS}
-        datesOf={() => []}
         actions={{} as TripActions}
         onShowTrip={vi.fn()}
         onShowRoute={vi.fn()}
@@ -171,11 +172,29 @@ describe('TripsPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Place' }))
     await userEvent.type(screen.getByRole('searchbox', { name: 'Place to add' }), 'per')
     await userEvent.click(within(screen.getByRole('list', { name: 'Places found' })).getByRole('button', { name: /^Peru/ }))
-    // Peru has a visit already, so it needs a date
+    // Each place in a trip has when
     expect(screen.getByRole('button', { name: 'Add place' })).toBeDisabled()
     await userEvent.selectOptions(within(screen.getByRole('group', { name: 'When you went to Peru' })).getByRole('combobox', { name: 'Year' }), '2019')
     await userEvent.click(screen.getByRole('button', { name: 'Add place' }))
     expect(actions.addPlace).toHaveBeenCalledWith('empty', 'Peru', '2019', 0)
+  })
+
+  it('adds a place to a trip in a month to come, for a trip you are going on', async () => {
+    const { actions } = setup()
+    await open(/Nothing in it yet/)
+    await userEvent.click(screen.getByRole('button', { name: 'Place' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Place to add' }), 'chile')
+    await userEvent.click(within(screen.getByRole('list', { name: 'Places found' })).getByRole('button', { name: /^Chile/ }))
+    const nextYear = String(new Date().getFullYear() + 1)
+    await userEvent.selectOptions(within(screen.getByRole('group', { name: 'When you went to Chile' })).getByRole('combobox', { name: 'Year' }), nextYear)
+    await userEvent.click(screen.getByRole('button', { name: 'Add place' }))
+    expect(actions.addPlace).toHaveBeenCalledWith('empty', 'Chile', nextYear, 0)
+  })
+
+  it('replays your trips', async () => {
+    const { onReplay } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+    expect(onReplay).toHaveBeenCalledOnce()
   })
 
   it('adds a flight to a trip, from where its last one landed', async () => {
@@ -189,16 +208,17 @@ describe('TripsPanel', () => {
     expect(actions.addFlight).toHaveBeenCalledWith('asia', ICN, CPH, '2024-04', views[0].items)
   })
 
-  it('lists what is in no trip yet, newest first, and puts it in a trip, or a new one', async () => {
+  it('lists the places visited that no trip went to, each once, and puts one in a trip, or a new one', async () => {
     const { actions } = setup()
     const loose = within(screen.getByRole('list', { name: 'Not in a trip yet' }))
     expect(loose.getAllByRole('listitem').map((li) => li.querySelector('.row-name')!.textContent)).toEqual([
-      'Peru',
       'Denmark',
+      'Peru',
       'Copenhagen → Lima',
     ])
+    expect(loose.queryByRole('button', { name: /Add when/ })).not.toBeInTheDocument() // dated in a trip
     await userEvent.selectOptions(loose.getByRole('combobox', { name: 'Put Peru in a trip' }), 'asia')
-    expect(actions.add).toHaveBeenCalledWith('asia', { kind: 'visit', place: 'Peru', date: '2019-11' }, 4)
+    expect(actions.add).toHaveBeenCalledWith('asia', { kind: 'visit', place: 'Peru', date: null }, 4)
     await userEvent.selectOptions(loose.getByRole('combobox', { name: 'Put the flight to Lima in a trip' }), 'new')
     expect(actions.create).toHaveBeenCalledWith('', [{ kind: 'flight', flight: 'l' } satisfies TripItem])
   })

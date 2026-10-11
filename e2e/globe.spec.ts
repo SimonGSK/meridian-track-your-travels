@@ -147,7 +147,8 @@ test.describe('visited', () => {
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
     await page.getByRole('searchbox', { name: 'Add a country' }).fill('Denmark')
     await page.keyboard.press('Enter')
-    // Its continent opens, to see it there
+    // In its continent's places
+    await page.getByRole('button', { name: 'Europe', exact: true }).click()
     const list = page.getByRole('list', { name: 'Visited in Europe' })
     await expect(list).toContainText('Denmark')
 
@@ -182,7 +183,8 @@ test.describe('visited states', () => {
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
     await page.getByRole('searchbox', { name: 'Add a country' }).fill('Australia')
     await page.getByRole('button', { name: /^Australia/ }).first().click()
-    await page.getByRole('button', { name: /^Australia/ }).first().click() // show it
+    await page.getByRole('button', { name: 'Oceania', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: /^Australia/ }).click() // show it
     await expect(panel(page).getByRole('heading', { name: 'Australia' })).toBeVisible()
 
     const statesLine = panel(page).getByRole('button', { name: /explored$/ })
@@ -207,7 +209,8 @@ test.describe('visited cities', () => {
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
     await page.getByRole('searchbox', { name: 'Add a country' }).fill('Japan')
     await page.getByRole('button', { name: /^Japan/ }).first().click()
-    await page.getByRole('button', { name: /^Japan/ }).first().click() // show it
+    await page.getByRole('button', { name: 'Asia', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: /^Japan/ }).click() // show it
     await expect(panel(page).getByRole('heading', { name: 'Japan' })).toBeVisible()
 
     const addCity = panel(page).getByRole('searchbox', { name: 'Add a city' })
@@ -239,13 +242,15 @@ test.describe('trips', () => {
     await page.getByRole('textbox', { name: 'Name of the new trip' }).fill(name)
     await page.keyboard.press('Enter')
   }
-  /** Adds a flight in the trip open, From and To found by what's typed */
+  /** Adds a flight in the trip open, From and To found by what's typed, in 2024 if it has no date yet */
   async function addFlight(page: Page, from: string | null, to: string) {
     for (const [label, query] of [['From', from], ['To', to]] as const) {
       if (!query) continue
       await page.getByRole('searchbox', { name: label, exact: true }).fill(query)
       await page.getByRole('list', { name: `${label} airports` }).getByRole('button').first().click()
     }
+    const year = page.getByRole('group', { name: 'When you flew' }).getByRole('combobox', { name: 'Year' })
+    if (!(await year.inputValue())) await year.selectOption('2024')
     await page.getByRole('button', { name: 'Add flight' }).click()
   }
 
@@ -265,6 +270,38 @@ test.describe('trips', () => {
     await trip.getByRole('button', { name: /^Copenhagen → Bangkok/ }).click()
     // The routes and their planes drew without complaints
     await page.waitForTimeout(1000)
+    expect(errors).toEqual([])
+  })
+
+  test('replaying the trips plays them oldest first, with planes, until stopped', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (localStorage.getItem('countries-app.trips')) return
+      localStorage.setItem('countries-app.visited', JSON.stringify(['Denmark']))
+      localStorage.setItem(
+        'countries-app.flights',
+        JSON.stringify([
+          { id: 'out', from: 'CPH', to: 'NRT', date: '2024-04' },
+          { id: 'back', from: 'NRT', to: 'CPH', date: '2024-04' },
+        ]),
+      )
+      const visit = (place: string, date: string) => ({ kind: 'visit', place, date })
+      localStorage.setItem(
+        'countries-app.trips',
+        JSON.stringify([
+          { id: 'n', name: 'Nordics', items: [visit('Sweden', '2018-07'), visit('Norway', '2018-07')] },
+          { id: 'j', name: 'Japan', items: [{ kind: 'flight', flight: 'out' }, visit('Japan', '2024-04'), { kind: 'flight', flight: 'back' }] },
+        ]),
+      )
+    })
+    const { errors } = await openGlobe(page)
+    await page.getByRole('button', { name: 'Visited', exact: true }).click()
+    await page.getByRole('tab', { name: 'Trips' }).click()
+    await page.getByRole('button', { name: 'Replay your trips' }).click()
+    const bar = page.getByRole('status', { name: 'Replaying your trips' })
+    await expect(bar).toContainText('Nordics')
+    await expect(bar).toContainText('Japan', { timeout: 10_000 })
+    await bar.getByRole('button', { name: 'Stop' }).click()
+    await expect(bar).toBeHidden()
     expect(errors).toEqual([])
   })
 
@@ -458,6 +495,7 @@ test.describe('wishlist', () => {
 
     await wishlist.getByRole('button', { name: 'Been to Peru: add it to your visited atlas' }).click()
     await expect(wishlist).toHaveCount(0)
+    await page.getByRole('button', { name: 'South America', exact: true }).click()
     await expect(page.getByRole('list', { name: 'Visited in South America' })).toContainText('Peru')
     await expect(page.getByText('1 visited')).toBeVisible()
   })
@@ -483,23 +521,24 @@ test.describe('year in review', () => {
     expect(errors).toEqual([])
   })
 
-  test('a dated visit gets its year, with the country under its month', async ({ page }) => {
+  test('a visit in a trip gets its year, with the country under its month, and shows in its panel', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
-    const add = page.getByRole('searchbox', { name: 'Add a country' })
-    await add.fill('Japan')
-    await add.press('Enter')
     await page.getByRole('tab', { name: 'Years' }).click()
     await expect(page.getByText(/^No dates yet/)).toBeVisible()
 
-    await page.getByRole('tab', { name: 'Countries' }).click()
-    await page.getByRole('button', { name: 'Asia', exact: true }).click()
-    await page.getByRole('button', { name: /^Japan/ }).click()
-    const visits = panel(page).getByRole('region', { name: 'Visits' })
-    await visits.getByRole('combobox', { name: 'Year' }).selectOption('2023')
-    await visits.getByRole('combobox', { name: 'Month' }).selectOption('April')
-    await visits.getByRole('button', { name: 'Add visit' }).click()
-    await panel(page).getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('tab', { name: 'Trips' }).click()
+    await page.getByRole('button', { name: 'New trip' }).click()
+    await page.getByRole('textbox', { name: 'Name of the new trip' }).fill('Tokyo')
+    await page.keyboard.press('Enter')
+    await page.getByRole('button', { name: 'Place', exact: true }).click()
+    await page.getByRole('searchbox', { name: 'Place to add' }).fill('japan')
+    await page.getByRole('list', { name: 'Places found' }).getByRole('button', { name: /^Japan/ }).click()
+    const when = page.getByRole('group', { name: 'When you went to Japan' })
+    await when.getByRole('combobox', { name: 'Year' }).selectOption('2023')
+    await when.getByRole('combobox', { name: 'Month' }).selectOption('April')
+    await page.getByRole('button', { name: 'Add place' }).click()
+    await expect(page.getByText('1 visited')).toBeVisible()
 
     await page.getByRole('tab', { name: 'Years' }).click()
     await expect(page.getByRole('heading', { name: '2023' })).toBeVisible()
@@ -507,6 +546,9 @@ test.describe('year in review', () => {
     const april = page.getByRole('list', { name: 'April' })
     await expect(april).toContainText('Japan')
     await expect(april).toContainText('First visit')
+    // Its panel has the visit, in its trip
+    await april.getByRole('button', { name: /^Japan/ }).click()
+    await expect(panel(page).getByRole('list', { name: 'Visits' })).toContainText(/Apr 2023.*Tokyo/)
   })
 })
 

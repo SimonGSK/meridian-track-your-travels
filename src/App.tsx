@@ -5,6 +5,7 @@ import { countries, tinyPlaces, type CountryFeature } from './countries'
 import { citiesLabel, citiesOf, countryOfCity, type City } from './data/cities'
 import { findRegionAt, hasRegions, regionsLabel, regionsOf, type RegionFeature } from './data/regions'
 import CountryPanel from './CountryPanel'
+import type { CountryVisit } from './visited/CountryVisits'
 import ExplorePanel from './explore/ExplorePanel'
 import { useSettings } from './explore/useSettings'
 import GamesPanel from './games/GamesPanel'
@@ -49,10 +50,12 @@ import AchievementsPanel from './visited/AchievementsPanel'
 import AchievementToast from './visited/AchievementToast'
 import GlobeKey from './ui/GlobeKey'
 import { useNewAchievements } from './visited/useNewAchievements'
-import { describeVisits, formatVisitDate, type VisitDate } from './data/visitDates'
-import { cityOf } from './data/airports'
+import { describeVisits, newestFirst, type VisitDate } from './data/visitDates'
+import { cityOf, countryOf } from './data/airports'
 import { FOLLOW_LEAD_IN, FOLLOW_STOP, followLandings, followSeconds } from './globe/follow'
 import FollowBar from './ui/FollowBar'
+import ReplayBar from './ui/ReplayBar'
+import { replayOf, replayedBy } from './data/replay'
 import UndoToast from './ui/UndoToast'
 import UpdateToast from './pwa/UpdateToast'
 import { useUpdateReady } from './pwa/useUpdateReady'
@@ -61,7 +64,7 @@ import { useUndo } from './ui/useUndo'
 import { useFlights } from './visited/useFlights'
 import { useTripNames } from './visited/useTripNames'
 import { usePlans, useToday } from './visited/usePlans'
-import { isToCome, monthOf } from './data/plans'
+import { isToCome } from './data/plans'
 import TripsPanel, { type TripActions } from './visited/TripsPanel'
 import { useTrips, newId } from './visited/useTrips'
 import VisitedTab, { type VisitedView } from './visited/VisitedTab'
@@ -70,7 +73,21 @@ import WrappedView from './visited/WrappedView'
 import { reviewOf, spotsOf, spotsOfStep, timelineOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { useTimeLapse } from './visited/useTimeLapse'
 import { distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
-import { journeysOf, looseOf, placeFor, titleOf, tripViewsOf, tripsFromFlights, visitsOf, type TripItem } from './data/savedTrips'
+import {
+  journeysOf,
+  looseOf,
+  placeFor,
+  titleOf,
+  tripViewsOf,
+  tripsFromFlights,
+  joinTrips,
+  tripsOfVisits,
+  visitItem,
+  visitsOf,
+  visitsOfPlans,
+  type TripItem,
+  type Visit,
+} from './data/savedTrips'
 import { regionFills, regionOutlines, regionProgress } from './visited/regionsView'
 import Tooltip from './Tooltip'
 import {
@@ -107,6 +124,13 @@ import { countryColor } from './globe/colors'
 const RENDERER_CONFIG = { antialias: true, alpha: true, powerPreference: 'high-performance' } as const
 
 const NO_VISITS: ReadonlySet<string> = new Set()
+const NO_DATES: readonly VisitDate[] = []
+
+/** What to keep in view to see places, by name, each as wide as it is */
+const spotsOfPlaces = (names: readonly string[]): Spot[] =>
+  countries
+    .filter((c) => names.includes(c.properties.name))
+    .map(({ properties: { centroid, extent } }) => ({ lng: centroid[0], lat: centroid[1], radius: extent / 2 }))
 /** How much the land's height shows in a picture of the Earth */
 const RELIEF = 40
 const NO_FLIGHTS = { lines: [], journeys: [] }
@@ -146,7 +170,38 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [chosenGame, setChosenGame] = useState<GameId | null>(null)
   /** What's opened in the More tab, kept while the screensaver is previewed from it */
   const [moreOpen, setMoreOpen] = useState<MoreId | null>(compareOnOpen ? 'compare' : null)
-  const { visited, add: addVisited, remove: removeVisited } = useVisited()
+  // Places marked visited, by hand
+  const { visited: marked, add: addVisited, remove: removeVisited } = useVisited()
+  const {
+    trips: savedTrips,
+    create: createTrip,
+    rename: renameTrip,
+    remove: removeTrip,
+    add: addToTrip,
+    takeOut: takeOutOfTrip,
+    move: moveInTrip,
+    redate: redateInTrips,
+    start: startTrips,
+    replaceAll: replaceTrips,
+  } = useTrips()
+  const today = useToday()
+  // Visits are in trips: those been on (or with no date), and those to come
+  const [pastVisits, visitsToCome] = useMemo(() => {
+    const now = new Date(`${today}T12:00`)
+    const all = (savedTrips ?? []).flatMap((trip) => trip.items.flatMap((item) => (item.kind === 'visit' ? [item] : [])))
+    return [all.filter((visit) => !visit.date || !isToCome(visit.date, now)), all.filter((visit) => visit.date && isToCome(visit.date, now))]
+  }, [savedTrips, today])
+  // Your atlas: the places marked visited, and those a trip has been to
+  const visited = useMemo(() => new Set([...marked, ...pastVisits.map((visit) => visit.place)]), [marked, pastVisits])
+  /** Places a trip has been to, which stay visited while it has */
+  const inTrips = useMemo(() => new Set(pastVisits.map((visit) => visit.place)), [pastVisits])
+  // When each place was visited, newest first, from the trips
+  const datesByPlace = useMemo(() => {
+    const dates = new Map<string, Set<VisitDate>>()
+    for (const { place, date } of pastVisits) if (date) dates.set(place, (dates.get(place) ?? new Set()).add(date))
+    return new Map([...dates].map(([place, all]) => [place, [...all].sort(newestFirst)]))
+  }, [pastVisits])
+  const datesOf = useCallback((name: string): readonly VisitDate[] => datesByPlace.get(name) ?? NO_DATES, [datesByPlace])
   const { wishlist: wished, add: addWish, remove: removeWish } = useWishlist()
   // A friend to compare with, shown on the globe until switched off (at once, when their link was opened)
   const [friend, setFriend] = useFriend()
@@ -218,80 +273,15 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [hoveredRegion, setHoveredRegion] = useState<RegionFeature | null>(null)
   const cities = useCities()
   const { visitedCities, toggle: toggleCityId, add: addCityId } = useVisitedCities()
-  const { datesOf, addVisit, removeVisit, noteOf, setNote } = useVisitDates()
+  // Notes on visits; and the dates saved before visits were made in trips, which go into trips (see below)
+  const { datesOf: datesBefore, noteOf, setNote, clearDates: clearDatesBefore } = useVisitDates()
   const [hoveredCity, setHoveredCity] = useState<City | null>(null)
   const airports = useAirports()
   const { flights, add: addFlight, remove: removeFlight, setDate: setFlightDate } = useFlights(cities, airports)
   // Names trips had before trips were made by hand: they go with them, the first time
   const { nameOf: tripNameOf } = useTripNames()
-  const {
-    trips: savedTrips,
-    create: createTrip,
-    rename: renameTrip,
-    remove: removeTrip,
-    add: addToTrip,
-    takeOut: takeOutOfTrip,
-    move: moveInTrip,
-    redate: redateInTrips,
-    start: startTrips,
-  } = useTrips()
-  /** A visit added: a place's first date goes to its visit in a trip, which had none */
-  const addVisitDate = useCallback(
-    (name: string, date: VisitDate) => {
-      if (datesOf(name).length === 0) redateInTrips(name, null, date)
-      addVisit(name, date)
-    },
-    [datesOf, redateInTrips, addVisit],
-  )
-  /** A visit's date taken away: a place's last one leaves its visit in a trip without one */
-  const removeVisitDate = useCallback(
-    (name: string, date: VisitDate) => {
-      const dates = datesOf(name)
-      if (dates.length === 1 && dates[0] === date) redateInTrips(name, date, null)
-      removeVisit(name, date)
-    },
-    [datesOf, redateInTrips, removeVisit],
-  )
-  // Visits planned, counted down to, until the day comes
-  const today = useToday()
-  const { plans, setPlan } = usePlans()
-  const unplan = useCallback(
-    (name: string) => {
-      const day = plans[name]
-      setPlan(name, null)
-      if (day) offerUndo(`Not going to ${name}`, () => setPlan(name, day))
-    },
-    [plans, setPlan, offerUndo],
-  )
-  /** Planned visits whose day has come: the places are in your atlas now, with the visit, and a note to take them back */
-  const arrive = useCallback(
-    (names: readonly string[]) => {
-      const arrived = names.map((name) => {
-        const month = monthOf(plans[name])
-        return { name, month, wasVisited: visited.has(name), wasWished: wished.has(name), hadVisit: datesOf(name).includes(month) }
-      })
-      for (const { name, month } of arrived) {
-        addPlace(name)
-        addVisitDate(name, month)
-        setPlan(name, null)
-      }
-      const listed = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
-      // Undone: didn't go after all
-      offerUndo(`Welcome to ${listed}! In your visited atlas now`, () => {
-        for (const { name, month, wasVisited, wasWished, hadVisit } of arrived) {
-          if (!hadVisit) removeVisitDate(name, month)
-          if (!wasVisited) removeVisited(name)
-          if (wasWished) addWish(name)
-        }
-      })
-    },
-    [plans, visited, wished, datesOf, addPlace, addVisitDate, setPlan, removeVisitDate, removeVisited, addWish, offerUndo],
-  )
-  // As the day of one comes, on opening the app or at midnight. Not in the screensaver, which only shows what's saved
-  useEffect(() => {
-    const due = Object.keys(plans).filter((name) => plans[name] <= today)
-    if (due.length > 0 && !screensaver) arrive(due)
-  }, [plans, today, screensaver, arrive])
+  // Visits planned before trips to come could be made: they become trips (see below)
+  const { plans: plansBefore, clear: clearPlansBefore } = usePlans()
   // A friend's link opened: their comparison
   const [visitedView, setVisitedView] = useState<VisitedView>('countries')
   /** A flight or trip picked in the list, shown on the globe (and highlighted) until the view moves on */
@@ -349,33 +339,64 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     const toCome = (route: Route) => !!route.flight.date && isToCome(route.flight.date, now)
     return [allRoutes.filter((route) => !toCome(route)), allRoutes.filter(toCome)]
   }, [allRoutes, today])
-  /** A visit removed, its note with it */
-  const removeVisitOf = (name: string, date: VisitDate) => {
-    const note = noteOf(name, date)
-    removeVisitDate(name, date)
-    offerUndo(`Removed the visit to ${name} in ${formatVisitDate(date)}`, () => {
-      addVisitDate(name, date)
-      if (note) setNote(name, date, note)
-    })
-  }
-  /** When a visit was, changed from the Trips list: its note and its place in a trip go with it */
+  /** When a visit was, changed in a trip: its note goes with it, and a visit that's been puts the place in your atlas */
   const changeVisitDate = (place: string, from: VisitDate | null, to: VisitDate | null) => {
     if (from === to) return
     const note = from ? noteOf(place, from) : undefined
-    if (from) removeVisit(place, from)
-    if (to) addVisit(place, to)
+    if (note && from) setNote(place, from, '')
     if (note && to) setNote(place, to, note)
     redateInTrips(place, from, to)
+    if (to && !isToCome(to)) addPlace(place)
   }
 
   // The trips as they stand, and what's in none yet
-  const visits = useMemo(() => visitsOf(visited, datesOf), [visited, datesOf])
-  const tripViews = useMemo(() => tripViewsOf(savedTrips ?? [], visits, allRoutes), [savedTrips, visits, allRoutes])
-  const looseTravels = useMemo(() => looseOf(tripViews, visits, allRoutes), [tripViews, visits, allRoutes])
-  // The first time, trips made from the flights there were, once their airports have loaded
+  const tripViews = useMemo(() => tripViewsOf(savedTrips ?? [], allRoutes), [savedTrips, allRoutes])
+  const looseTravels = useMemo(() => looseOf(tripViews, marked, allRoutes), [tripViews, marked, allRoutes])
+  // What there was before visits were only made in trips goes into trips, once the airports have loaded: the first
+  // time, trips worked out from the flights; and dated visits in none, a trip a month, and plans, trips to come
   useEffect(() => {
-    if (savedTrips === null && airports) startTrips(tripsFromFlights(allRoutes, visits, tripNameOf, newId))
-  }, [savedTrips, airports, allRoutes, visits, tripNameOf, startTrips])
+    if (!airports) return
+    const before = visitsOf(marked, datesBefore)
+    const datedBefore = before.some((visit) => visit.date)
+    const planned = Object.keys(plansBefore).length > 0
+    if (savedTrips !== null && !datedBefore && !planned) return
+    const made = savedTrips ?? tripsFromFlights(allRoutes, before, tripNameOf, newId)
+    // Each into a trip whose flight lands there then, or else a trip a month (a plan, one of its own)
+    const plannedVisits = visitsOfPlans(plansBefore)
+    const { trips: joined, rest } = joinTrips(made, [...before.filter((visit) => visit.date), ...plannedVisits], allRoutes)
+    const isPlanned = (visit: Visit) => plannedVisits.includes(visit)
+    const all = [
+      ...joined,
+      ...tripsOfVisits(joined, rest.filter((visit) => !isPlanned(visit)), newId),
+      ...rest.filter(isPlanned).map((visit) => ({ id: newId(), name: '', items: [visitItem(visit)] })),
+    ]
+    if (savedTrips === null) startTrips(all)
+    else replaceTrips(all)
+    if (datedBefore) clearDatesBefore()
+    if (planned) clearPlansBefore()
+  }, [airports, marked, datesBefore, plansBefore, savedTrips, allRoutes, tripNameOf, startTrips, replaceTrips, clearDatesBefore, clearPlansBefore])
+  // The selected place's visits, each in its trip: to come first, then newest first, without a date last
+  const selectedVisits = useMemo((): CountryVisit[] => {
+    if (!selected) return []
+    const now = new Date(`${today}T12:00`)
+    const name = selected.properties.name
+    return tripViews
+      .flatMap((trip) =>
+        trip.items.flatMap((item) =>
+          item.kind === 'visit' && item.place === name ? [{ date: item.date, trip, toCome: !!item.date && isToCome(item.date, now) }] : [],
+        ),
+      )
+      .sort((a, b) => (a.date && b.date ? newestFirst(a.date, b.date) : a.date ? -1 : b.date ? 1 : 0))
+  }, [selected, tripViews, today])
+  /** The trip open in the Trips list */
+  const [openTripId, setOpenTripId] = useState<string | null>(null)
+  /** Opens a trip in the Trips list, from a place's visits */
+  const openTrip = (id: string) => {
+    selectCountry(null)
+    setVisitedView('trips')
+    setOpenTripId(id)
+    changeView('visited')
+  }
   /** The trip a flight is in */
   const tripOfFlight = (id: string) => tripViews.find((view) => view.routes.some((route) => route.flight.id === id)) ?? null
   // A trip picked in the list, or one of its flights, says what it's called on the globe
@@ -435,12 +456,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   /** Flies to see a trip's places, for one without flights */
   const showPlaces = (items: readonly TripItem[]) => {
     selectCountry(null)
-    flyToSee(
-      items.flatMap((item) => {
-        const place = item.kind === 'visit' ? countries.find((c) => c.properties.name === item.place) : null
-        return place ? [{ lng: place.properties.centroid[0], lat: place.properties.centroid[1], radius: place.properties.extent / 2 }] : []
-      }),
-    )
+    flyToSee(spotsOfPlaces(items.flatMap((item) => (item.kind === 'visit' ? [item.place] : []))))
     if (isPhone()) setView('explore')
   }
   /** What can be done in the Trips list */
@@ -455,8 +471,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     takeOut: takeOutOfTrip,
     move: moveInTrip,
     addPlace: (id, place, date, index) => {
-      if (!visited.has(place)) addPlace(place)
-      if (date) addVisitDate(place, date)
+      // Been: in your atlas. To come: a trip you're going on
+      if (!date || !isToCome(date)) addPlace(place)
       addToTrip(id, { kind: 'visit', place, date }, index)
     },
     addFlight: (id, from, to, date, items) => {
@@ -519,6 +535,41 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
   }, [following, flyToSee, finishFollowing])
 
+  // Replaying your trips, from the Trips list: every trip been on, oldest first, its flights flown and its places colored
+  // as they're reached, staying colored. On phones the panel makes way, and comes back at the end (`reopen`)
+  const [replay, setReplay] = useState<(ReturnType<typeof replayOf> & { startedAt: number; reopen: boolean }) | null>(null)
+  /** The step of the replay begun last */
+  const [replayAt, setReplayAt] = useState(-1)
+  const canReplay = useMemo(() => replayOf(tripViews).steps.length > 0, [tripViews])
+  const startReplay = () => {
+    selectCountry(null)
+    setShownRoutes(null)
+    setFollowing(null)
+    setReplayAt(-1)
+    setReplay({ ...replayOf(tripViews), startedAt: performance.now() / 1000, reopen: isPhone() })
+    if (isPhone()) setView('explore')
+  }
+  const finishReplay = useCallback(() => {
+    if (replay?.reopen) setView('visited')
+    setReplay(null)
+  }, [replay])
+  useEffect(() => {
+    if (!replay) return
+    const timers = replay.steps.map((step, i) =>
+      setTimeout(() => {
+        setReplayAt(i)
+        // The globe turns to each flight, and to each place not just landed in
+        const before = replay.steps[i - 1]
+        if (step.kind === 'flight') flyToSee(spotsOfRoute(step.route))
+        else if (before?.kind !== 'flight' || countryOf(before.route.to) !== step.place) flyToSee(spotsOfPlaces([step.place]))
+      }, step.at * 1000),
+    )
+    // A moment on the last, then everything again
+    timers.push(setTimeout(finishReplay, (replay.seconds + 1.5) * 1000))
+    return () => timers.forEach(clearTimeout)
+  }, [replay, flyToSee, finishReplay])
+  const replayed = useMemo(() => (replay ? replayedBy(replay.steps, replayAt) : null), [replay, replayAt])
+
   // A selected country with states isn't raised: it stays flat so its states can be picked on the globe
   const editing = !playing && selected && hasRegions(selected) ? selected : null
   const editingRegions = useMemo(() => (editing && regions ? regionsOf(regions, editing) : []), [editing, regions])
@@ -544,6 +595,13 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   const highlights = useMemo(() => {
     const colors = gameHighlights(game, theme)
+    // Replaying, the places of the trip it's on stand out over those before
+    if (replayed) {
+      return new Map([
+        ...colors,
+        ...countries.filter((c) => replayed.thisTrip.has(c.properties.name)).map((c) => [c, theme.correct] as const),
+      ])
+    }
     // In the time-lapse, the year's places stand out over those before: new ones brighter than those visited again
     if (lapseStep) {
       return new Map([
@@ -553,7 +611,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       ])
     }
     return editing ? new Map([...colors, [editing, theme.selected]]) : colors
-  }, [game, theme, editing, lapseStep])
+  }, [game, theme, editing, lapseStep, replayed])
 
   // Games get a clean globe: no visited colors, and hover only where the globe is the answer
   // In games only countries are answers, so territories don't light up
@@ -562,7 +620,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const hoverable =
     !!hovered && (!playing || (globeIsAnswer && !findingCity && hovered.properties.kind === 'country'))
   const colorHovered = hoverable ? hovered : null
-  const colorVisited = lapseStep
+  const colorVisited = replayed
+    ? replayed.places
+    : lapseStep
     ? lapseStep.names
     : yearShown
       ? yearShown.names
@@ -577,7 +637,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // A year picked in the Years tab: its places first visited then, and those visited again a darker shade, as in the
   // time-lapse
   const yearPicked = lapseStep ? null : yearShown
-  const marked = useMemo(() => {
+  const markedColors = useMemo(() => {
     if (compareShown && comparison) {
       return new Map([
         ...comparison.both.map((c) => [c.properties.name, theme.correct] as const),
@@ -591,10 +651,14 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     return undefined
   }, [compareShown, comparison, yearPicked, theme])
-  const colorWishlist = yearShown || compareShown || showsGame(game) || !settings.showWishlist ? NO_VISITS : wishlist
+  const colorWishlist = yearShown || replay || compareShown || showsGame(game) || !settings.showWishlist ? NO_VISITS : wishlist
   // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's)
-  const plansShown = !yearShown && !compareShown && !showsGame(game) && !previewing && !screensaver
-  const plannedNames = useMemo(() => new Set(Object.keys(plans)), [plans])
+  const plansShown = !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
+  // The places of trips to come you haven't been to yet
+  const plannedNames = useMemo(
+    () => new Set(visitsToCome.map((visit) => visit.place).filter((place) => !visited.has(place))),
+    [visitsToCome, visited],
+  )
   const colorPlanned = plansShown ? plannedNames : NO_VISITS
   const plannedPlaces = useMemo(
     () => (plansShown ? countries.filter((c) => plannedNames.has(c.properties.name)) : []),
@@ -613,10 +677,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         wishlist: colorWishlist,
         planned: colorPlanned,
         visits: heatShown ? visitsTo : undefined,
-        marked,
+        marked: markedColors,
         highlights,
       }),
-    [theme, colorHovered, colorVisited, colorWishlist, colorPlanned, heatShown, visitsTo, marked, highlights],
+    [theme, colorHovered, colorVisited, colorWishlist, colorPlanned, heatShown, visitsTo, markedColors, highlights],
   )
   // Game answers on tiny islands get a dot, or they'd be invisible
   const gameColors = useMemo(() => gameHighlights(game, theme), [game, theme])
@@ -635,7 +699,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         ? regionFills({
             regions,
             visitedRegions,
-            isShownCountry: (c) => !yearShown && !compareOpen && settings.showRegions && visited.has(c.properties.name),
+            isShownCountry: (c) =>
+              !yearShown && !replay && !compareOpen && settings.showRegions && visited.has(c.properties.name),
             editing,
             hovered: hoveredRegion,
             hoveredCountry: hoveredWithRegions,
@@ -649,6 +714,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       game,
       visitedRegions,
       yearShown,
+      replay,
       compareOpen,
       settings.showRegions,
       visited,
@@ -698,12 +764,12 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // A pin on each visited city, standing on the selected country when it's raised; in "find the city" the answer's
   const pinned = useMemo(() => {
     if (cityAnswer) return [{ city: cityAnswer.city, lat: cityAnswer.city.lat, lng: cityAnswer.city.lng, raised: false }]
-    return cities && settings.showCities && !showsGame(game) && !yearShown && !compareOpen
+    return cities && settings.showCities && !showsGame(game) && !yearShown && !replay && !compareOpen
       ? cities
           .filter((c) => visitedCities.has(c.id))
           .map((city) => ({ city, lat: city.lat, lng: city.lng, raised: !editing && countryOfCity(city) === selected }))
       : []
-  }, [cityAnswer, cities, settings.showCities, game, yearShown, compareOpen, visitedCities, editing, selected])
+  }, [cityAnswer, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
   usePinLayer(globe, pinned, cityAnswer ? theme.correct : theme.pin, screensaver || previewing ? SCREENSAVER_PIN_FADE : PIN_FADE)
   // Night as it is now, lit by the cities; not in games, where it would hide what to find
   // With a picture of the Earth's lights at night, the cities are lit in it, rather than as dots
@@ -721,6 +787,23 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     if (cityAnswer?.guess.position) {
       const line = { key: `city-${cityAnswer.city.id}`, from: cityAnswer.guess.position, to: cityAnswer.city, highlighted: true }
       return { lines: [line], journeys: [{ key: line.key, legs: [line], highlighted: true }] }
+    }
+    // Replaying: the flights flown so far, those of the trip it's on standing out, each plane flying once in its turn
+    if (replay && replayed) {
+      return {
+        lines: uniqueRoutes(replayed.flights.map((step) => step.route)).map((route) => ({
+          key: route.flight.id,
+          from: route.from,
+          to: route.to,
+          highlighted: replayed.flights.some((step) => step.trip === replayed.trip && uniqueRoutes([route, step.route]).length === 1),
+        })),
+        journeys: replayed.flights.map((step) => ({
+          key: `replay-${step.at}`,
+          legs: [step.route],
+          highlighted: true,
+          timing: { startsAt: replay.startedAt + step.at, seconds: [step.seconds], stop: 0 },
+        })),
+      }
     }
     // Following a trip: just it, the flight being flown standing out, and its plane flying it once
     if (following) {
@@ -788,6 +871,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     game,
     shownRoutes,
     savedTrips,
+    replay,
+    replayed,
   ])
   useFlightLayer(globe, flightsShown.lines, flightsShown.journeys, { color: theme.flight, highlight: theme.selected })
   const cityAt = useCallback(
@@ -803,7 +888,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   useDepthPrecision(globe)
   // Not while a year is shown either: it turned to that year's places
   // The preview spins at once, as the real screensaver does
-  useSmoothAutoRotate(globe, !selected && !playing && !shownRoutes && !yearShown, previewing)
+  useSmoothAutoRotate(globe, !selected && !playing && !shownRoutes && !yearShown && !replay, previewing)
 
   const onGlobeClick = useCallback(
     (country: CountryFeature | null, position: LatLng | null, point: Point) => {
@@ -896,6 +981,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // Leaving the Games panel ends the game
   const changeView = (next: ViewId) => {
     setFollowing(null)
+    setReplay(null)
     if (view === 'games' && next !== 'games') {
       quitGame()
       setChosenGame(null)
@@ -921,6 +1007,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       if (e.key !== 'Escape' || previewing) return
       if (wrapping) setWrapping(false)
       else if (following) setFollowing(null)
+      else if (replay) setReplay(null)
       else if (selected) selectCountry(null)
       else if (shownRoutes) setShownRoutes(null)
       else {
@@ -932,7 +1019,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [wrapping, following, selected, shownRoutes, selectCountry, quitGame, previewing])
+  }, [wrapping, following, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
 
   /** The screensaver's preview, from Settings: nothing picked, from the screensaver's view */
   const startPreview = () => {
@@ -997,6 +1084,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
               // Taking hold of the globe stops following a trip
               onPointerDown: (e: ReactPointerEvent) => {
                 setFollowing(null)
+                setReplay(null)
                 pointerHandlers.onPointerDown(e)
               },
             })}
@@ -1026,7 +1114,14 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
           <span>drag to spin</span>
           <span>{isPhone() ? 'pinch to zoom' : 'scroll to zoom'}</span>
         </p>
-        {following ? (
+        {replay ? (
+          <ReplayBar
+            trip={replayed && replayed.trip >= 0 ? replay.trips[replayed.trip] : null}
+            index={Math.max(replayed?.trip ?? 0, 0)}
+            count={replay.trips.length}
+            onStop={() => setReplay(null)}
+          />
+        ) : following ? (
           <FollowBar
             name={tripOfFlight(following.legs[0].flight.id)?.trip.name.trim() || null}
             leg={following.legs[followLeg]}
@@ -1103,8 +1198,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   wishlist={wishlist}
                   onWish={addWish}
                   onUnwish={unwish}
-                  plans={plans}
-                  onUnplan={unplan}
+                  inTrips={inTrips}
                   onShow={showCountry}
                   note={(country) => {
                     const notes = [describeVisits(datesOf(country.properties.name))]
@@ -1150,12 +1244,14 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   routes={allRoutes}
                   flown={routes}
                   airports={airports}
-                  datesOf={datesOf}
                   actions={tripActions}
+                  open={openTripId}
+                  onOpen={setOpenTripId}
                   onShowTrip={(trip) => (trip.routes.length ? showRoutes(trip.routes) : showPlaces(trip.items))}
                   onShowRoute={(route) => showRoutes([route])}
                   onShowPlace={showCountry}
                   onFollowTrip={followTrip}
+                  onReplay={canReplay ? startReplay : undefined}
                 />
               }
             />
@@ -1269,20 +1365,16 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
               : undefined
           }
           visits={
-            visited.has(selected.properties.name)
+            visited.has(selected.properties.name) || selectedVisits.length > 0
               ? {
-                  dates: datesOf(selected.properties.name),
-                  onAdd: (date) => addVisitDate(selected.properties.name, date),
-                  onRemove: (date) => removeVisitOf(selected.properties.name, date),
+                  visits: selectedVisits,
                   noteOf: (date) => noteOf(selected.properties.name, date),
                   onNote: (date, note) => setNote(selected.properties.name, date, note),
+                  onOpenTrip: openTrip,
                 }
               : undefined
           }
-          plan={{
-            day: plans[selected.properties.name] ?? null,
-            onChange: (day) => (day ? setPlan(selected.properties.name, day) : unplan(selected.properties.name)),
-          }}
+          onTrips={inTrips.has(selected.properties.name)}
         />
       )}
         </>

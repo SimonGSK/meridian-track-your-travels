@@ -120,8 +120,10 @@ export function useTrips() {
     [change],
   )
 
-  /** The trips made from the flights there were, the first time */
+  /** The trips made from what there was before trips, the first time */
   const start = useCallback((made: SavedTrip[]) => setTrips((prev) => prev ?? made), [setTrips])
+  /** The trips, with what there was before put in, later */
+  const replaceAll = useCallback((made: SavedTrip[]) => setTrips(made), [setTrips])
 
-  return { trips, create, rename, remove, add, takeOut, move, redate, start }
+  return { trips, create, rename, remove, add, takeOut, move, redate, start, replaceAll }
 }

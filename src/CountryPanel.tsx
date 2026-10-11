@@ -4,8 +4,7 @@ import { factsOf, formatArea, formatAreaShort, formatPopulation, formatPopulatio
 import { CheckIcon, CloseIcon, PlusIcon, StarIcon } from './icons'
 import CityPicker from './CityPicker'
 import RegionPicker from './RegionPicker'
-import VisitsCard from './visited/VisitsCard'
-import PlanVisit from './visited/PlanVisit'
+import CountryVisits from './visited/CountryVisits'
 import { useSwipeToClose } from './nav/swipeToClose'
 
 type Props = {
@@ -20,15 +19,15 @@ type Props = {
   regions?: ComponentProps<typeof RegionPicker>
   /** For countries with cities to pick */
   cities?: ComponentProps<typeof CityPicker>
-  /** When you went, once it's visited */
-  visits?: ComponentProps<typeof VisitsCard>
-  /** A visit you're planning */
-  plan?: ComponentProps<typeof PlanVisit>
+  /** Its visits, each in the trip it was part of */
+  visits?: ComponentProps<typeof CountryVisits>
+  /** Visited on a trip, so in your atlas while the trip has it */
+  onTrips?: boolean
 }
 
 /** The selected country, on the left: "SELECTED COUNTRY", its facts, cities and states. */
 export default function CountryPanel(props: Props) {
-  const { country, visited, onToggleVisited, wished = false, onToggleWish, onClose, regions, cities, visits, plan } = props
+  const { country, visited, onToggleVisited, wished = false, onToggleWish, onClose, regions, cities, visits, onTrips = false } = props
   const { name, kind, continent, areaKm2: mapArea, isoCode, isoAlpha2 } = country.properties
   const facts = factsOf(country)
   const code = isoCode ?? isoAlpha2
@@ -51,25 +50,27 @@ export default function CountryPanel(props: Props) {
       </h2>
       <p className="panel-meta">{[continent, regionCount].filter(Boolean).join(' · ')}</p>
       {facts && <Facts facts={facts} mapArea={mapArea} />}
-      {visits && <VisitsCard {...visits} />}
+      {visits && <CountryVisits {...visits} />}
       {cities && <CityPicker {...cities} />}
       {regions && <RegionPicker {...regions} />}
       <button
         type="button"
         className={`atlas-button${visited ? ' on' : ''}`}
         aria-pressed={visited}
+        // A trip went there: it stays in your atlas while the trip has it
+        disabled={onTrips}
         onClick={onToggleVisited}
       >
         {visited ? <CheckIcon size={18} /> : <PlusIcon size={18} />}
         {visited ? 'In visited atlas' : 'Add to visited atlas'}
       </button>
+      {onTrips && <p className="muted small atlas-note">Visited on a trip: take it out of the trip to remove it.</p>}
       {!visited && onToggleWish && (
         <button type="button" className={`wish-button${wished ? ' on' : ''}`} aria-pressed={wished} onClick={onToggleWish}>
           <StarIcon size={16} filled={wished} />
           {wished ? 'On your wishlist' : 'Add to wishlist'}
         </button>
       )}
-      {plan && <PlanVisit {...plan} />}
     </aside>
   )
 }

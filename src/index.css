@@ -1483,6 +1483,73 @@ code {
   gap: 5px;
 }
 
+/* A continent's places, over everything: those visited, then the countries not yet */
+.popup-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(3, 8, 14, 0.6);
+  animation: fade-in 0.15s ease-out;
+}
+
+.popup {
+  width: min(420px, 100%);
+  max-height: min(640px, calc(100dvh - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-strong);
+}
+
+.popup .card-header {
+  flex: none;
+}
+
+.popup-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.popup-body h3:first-child {
+  margin-top: 4px;
+}
+
+/* Countries not been to yet, quieter than those visited */
+.continent-places.not-yet .row-name {
+  color: var(--text-muted);
+}
+
+.continent-places.not-yet .mini-flag {
+  opacity: 0.55;
+}
+
+/* A visit's trip, under its date in the country's panel */
+.visit-trip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 13px;
+  text-align: left;
+}
+
+.visit-trip .mini-flag {
+  width: 20px;
+  height: 15px;
+}
+
+.visit-list li.to-come .dot {
+  background: var(--blue);
+}
+
+.atlas-note {
+  margin-top: 6px;
+}
+
 /* Trips: each a card of its own, opened to its places and flights */
 .trip-list {
   display: grid;
@@ -3102,7 +3169,8 @@ code {
   position: fixed;
   left: 50%;
   bottom: 80px;
-  z-index: 5;
+  /* Over a continent's places too, to undo what was done there */
+  z-index: 25;
   display: flex;
   flex-direction: column;
   gap: 8px;
