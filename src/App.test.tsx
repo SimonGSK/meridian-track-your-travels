@@ -15,6 +15,7 @@ import { SETTINGS_KEY } from './explore/useSettings'
 import { loadCities } from './data/cities'
 import { loadAirports } from './data/airports'
 import { loadRegions } from './data/regions'
+import { REPLAY_GAP, REPLAY_LEAD_IN, REPLAY_PAUSE } from './data/replay'
 import {
   DEFAULT_THEME,
   NIGHT,
@@ -26,7 +27,6 @@ import {
   revisitColor,
   visitedRegionColor,
 } from './globe/themes'
-import { dayOf } from './data/plans'
 import { INITIAL_VIEW, SCREENSAVER_VIEW } from './globe/interaction'
 import { SCREENSAVER_PIN_FADE } from './globe/pinLayer'
 import { UPDATE_READY } from './pwa/update'
@@ -169,12 +169,25 @@ const countryPanel = () => screen.queryByRole('complementary')
 const panelHeading = () => countryPanel()?.querySelector('h2') ?? null
 const sidePanel = () => document.getElementById('side-panel')
 /** Opens a continent's places under its bar, in the Visited tab */
+/** Opens a continent's places, in the Visited tab, over the rest */
 const openContinent = (continent: string) => userEvent.click(within(sidePanel()!).getByRole('button', { name: continent }))
 /** Explore's layers button, opening the designs and the layers, with Explore opened first if it isn't */
 const openLayers = async () => {
   if (!screen.queryByRole('button', { name: 'Style and layers' })) await userEvent.click(screen.getByRole('button', { name: 'Explore' }))
   await userEvent.click(screen.getByRole('button', { name: 'Style and layers' }))
 }
+/** Trips saved, each its visits and flights: [place, date] for a visit, a flight's id */
+const withTrips = (...trips: { name?: string; items: ([string, string | null] | string)[] }[]) =>
+  localStorage.setItem(
+    'countries-app.trips',
+    JSON.stringify(
+      trips.map(({ name = '', items }, i) => ({
+        id: `trip-${i + 1}`,
+        name,
+        items: items.map((item) => (typeof item === 'string' ? { kind: 'flight', flight: item } : { kind: 'visit', place: item[0], date: item[1] })),
+      })),
+    ),
+  )
 /** Opens a trip in the Trips list, by what's read out for it: when, its name, and the countries of its flags */
 const openTrip = async (name: RegExp) => {
   const header = await waitFor(() => {
@@ -615,45 +628,49 @@ describe('App', () => {
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
       await userEvent.type(screen.getByRole('searchbox'), 'japan{Enter}')
-      expect(within(sidePanel()!).getByRole('list', { name: 'Visited in Asia' })).toHaveTextContent('Japan') // its continent opened
       expect(painted()).toEqual({ Japan: DEFAULT_THEME.visited })
+      await openContinent('Asia')
+      expect(screen.getByRole('list', { name: 'Visited in Asia' })).toHaveTextContent('Japan')
     })
-
     it('shows a visited country on the globe when picked from the list', async () => {
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
       await userEvent.type(screen.getByRole('searchbox'), 'denmark{Enter}')
-      await userEvent.click(within(sidePanel()!).getByRole('button', { name: 'Denmark' }))
+      await openContinent('Europe')
+      await userEvent.click(within(screen.getByRole('list', { name: 'Visited in Europe' })).getByRole('button', { name: 'Denmark' }))
       expect(panelHeading()).toHaveTextContent('Denmark')
       expect(globe.pointOfView).toHaveBeenLastCalledWith(expect.objectContaining({ altitude: 1.8 }), expect.any(Number))
     })
-
-    it('keeps when you went, once visited, and shows the latest visit in the Visited list', async () => {
+    it("shows a place's visits from its trips, each with its trip to open, and none to add there", async () => {
+      withTrips({ name: 'Roskilde', items: [['Denmark', '2019-06']] }, { items: [['Denmark', '2017'], ['Sweden', '2017']] })
       render(<App />)
       click(100)
-      expect(within(countryPanel()!).queryByRole('region', { name: 'Visits' })).not.toBeInTheDocument()
-      await userEvent.click(within(countryPanel()!).getByRole('button', { name: 'Add to visited atlas' }))
       const visits = within(within(countryPanel()!).getByRole('region', { name: 'Visits' }))
-      await userEvent.selectOptions(visits.getByRole('combobox', { name: 'Year' }), '2019')
-      await userEvent.click(visits.getByRole('button', { name: 'Add visit' }))
-      await userEvent.selectOptions(visits.getByRole('combobox', { name: 'Month' }), 'June')
-      await userEvent.click(visits.getByRole('button', { name: 'Add visit' }))
-      expect(visits.getByRole('list', { name: 'Visits' })).toHaveTextContent('Jun 20192019')
+      expect(visits.getByRole('list', { name: 'Visits' })).toHaveTextContent(/^Jun 2019Roskilde2017$/)
+      expect(within(countryPanel()!).queryByRole('button', { name: 'Add visit' })).not.toBeInTheDocument()
+      expect(within(countryPanel()!).queryByRole('button', { name: 'Plan a visit' })).not.toBeInTheDocument()
+      // A trip went there: in the atlas while it has
+      expect(within(countryPanel()!).getByRole('button', { name: 'In visited atlas' })).toBeDisabled()
+      expect(visits.getByRole('button', { name: 'Open the trip Denmark → Sweden' })).toBeInTheDocument()
 
-      await userEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Visited' }))
+      await userEvent.click(visits.getByRole('button', { name: 'Open the trip Roskilde' }))
+      expect(countryPanel()).not.toBeInTheDocument()
+      expect(sidePanel()).toHaveAccessibleName('Visited')
+      expect(screen.getByRole('tab', { name: 'Trips' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('list', { name: 'What the trip Roskilde was' })).toHaveTextContent('Denmark')
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Countries' }))
       await openContinent('Europe')
       expect(screen.getByRole('button', { name: /^Denmark/ })).toHaveTextContent('2 visits, last Jun 2019')
     })
-
     it('keeps a note on a visit, shown in the panel and in that year', async () => {
-      localStorage.setItem('countries-app.visited', JSON.stringify(['Denmark']))
-      localStorage.setItem('countries-app.visit-dates', JSON.stringify({ Denmark: ['2019-06'] }))
+      withTrips({ items: [['Denmark', '2019-06']] })
       const first = render(<App />)
       click(100)
       const visits = within(within(countryPanel()!).getByRole('region', { name: 'Visits' }))
       await userEvent.click(visits.getByRole('button', { name: 'Add a note to the visit in Jun 2019' }))
       await userEvent.type(visits.getByRole('textbox', { name: 'Note on the visit in Jun 2019' }), 'Roskilde Festival{Enter}')
-      expect(visits.getByRole('list', { name: 'Visits' })).toHaveTextContent('Jun 2019Roskilde Festival')
+      expect(visits.getByRole('list', { name: 'Visits' })).toHaveTextContent('Roskilde Festival')
       first.unmount()
 
       render(<App />)
@@ -662,6 +679,30 @@ describe('App', () => {
       expect(screen.getByRole('button', { name: /^Denmark/ })).toHaveTextContent('DenmarkFirst visit · Roskilde Festival')
     })
 
+    it('moves dates and plans saved before trips into trips: with a flight landing there, or a trip a month', async () => {
+      const saved = (key: string) => JSON.parse(localStorage.getItem(`countries-app.${key}`) ?? 'null')
+      const nextYear = new Date().getFullYear() + 1
+      localStorage.setItem('countries-app.visited', JSON.stringify(['Denmark', 'Sweden', 'Norway', 'Japan']))
+      localStorage.setItem('countries-app.visit-dates', JSON.stringify({ Sweden: ['2018-07'], Norway: ['2018-07'], Japan: ['2024-04'] }))
+      localStorage.setItem('countries-app.plans', JSON.stringify({ Peru: `${nextYear}-03-10` }))
+      localStorage.setItem(
+        'countries-app.flights',
+        JSON.stringify([
+          { id: 'a', from: 'CPH', to: 'NRT', date: '2024-04' },
+          { id: 'b', from: 'NRT', to: 'CPH', date: '2024-04' },
+        ]),
+      )
+      render(<App />)
+      await waitFor(() => expect(saved('visit-dates')).toEqual({}))
+      expect(saved('plans')).toEqual({})
+      const trips = saved('trips') as { items: { kind: string; place?: string; date?: string; flight?: string }[] }[]
+      const said = trips.map((trip) => trip.items.map((item) => (item.kind === 'visit' ? `${item.place} ${item.date}` : item.flight)))
+      expect(said).toEqual([['a', 'Japan 2024-04', 'b'], ['Sweden 2018-07', 'Norway 2018-07'], [`Peru ${nextYear}-03`]])
+      // Denmark, marked visited without a date, waits in no trip
+      await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
+      expect(screen.getByRole('list', { name: 'Not in a trip yet' })).toHaveTextContent(/^Denmark/)
+    })
     it('remembers visited countries after a reload', async () => {
       const first = render(<App />)
       click(100)
@@ -888,19 +929,18 @@ describe('App', () => {
       expect(saved('wishlist')).toEqual(['Peru'])
     })
 
-    it('puts back a visit with its note', async () => {
-      localStorage.setItem('countries-app.visit-dates', JSON.stringify({ Denmark: ['2019-06', '2023'] }))
-      localStorage.setItem('countries-app.visit-notes', JSON.stringify({ Denmark: { '2019-06': 'Midsummer' } }))
+    it('puts back a trip removed', async () => {
+      withTrips({ name: 'Midsummer', items: [['Denmark', '2019-06']] })
       render(<App />)
-      click(100)
-      await userEvent.click(within(countryPanel()!).getByRole('button', { name: 'Remove the visit in Jun 2019' }))
-      expect(note()).toHaveTextContent('Removed the visit to Denmark in Jun 2019')
-      expect(saved('visit-notes')).toEqual({})
+      await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
+      await openTrip(/Midsummer/)
+      await userEvent.click(screen.getByRole('button', { name: 'Remove trip' }))
+      expect(screen.getByText('Removed the trip Midsummer')).toBeInTheDocument()
+      expect(saved('trips')).toEqual([])
       await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-      expect(saved('visit-dates').Denmark).toEqual(expect.arrayContaining(['2019-06', '2023']))
-      expect(saved('visit-notes')).toEqual({ Denmark: { '2019-06': 'Midsummer' } })
+      expect(saved('trips')).toEqual([{ id: 'trip-1', name: 'Midsummer', items: [{ kind: 'visit', place: 'Denmark', date: '2019-06' }] }])
     })
-
     it('puts back a city', async () => {
       const copenhagen = (await loadCities()).find((c) => c.name === 'Copenhagen' && c.place === 'DK')!
       localStorage.setItem('countries-app.visited-cities', JSON.stringify([copenhagen.id]))
@@ -954,52 +994,30 @@ describe('App', () => {
   })
 
   describe('upcoming trips', () => {
-    const saved = (key: string) => JSON.parse(localStorage.getItem(`countries-app.${key}`) ?? 'null')
-    /** A day this many days from now */
-    const inDays = (n: number) => {
-      const now = new Date()
-      return dayOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n))
-    }
     const outlined = () => ((planLayer.show.mock.calls.at(-1)?.[0] ?? []) as CountryFeature[]).map((c) => c.properties.name)
     beforeAll(() => loadAirports(), 20_000)
     beforeEach(() => planLayer.show.mockClear())
 
-    it('plans a visit from its panel: tinted and outlined on the globe, counted down to in the Visited tab', async () => {
+    it('shows a trip to come: its places tinted and outlined on the globe, counted down to in their panel, not yet visited', async () => {
+      const nextYear = new Date().getFullYear() + 1
+      withTrips({ items: [['Denmark', `${nextYear}-03`]] })
       render(<App />)
-      click(100)
-      await userEvent.click(within(countryPanel()!).getByRole('button', { name: 'Plan a visit' }))
-      fireEvent.change(within(countryPanel()!).getByLabelText("The day you're going"), { target: { value: inDays(23) } })
-      await userEvent.click(within(countryPanel()!).getByRole('button', { name: 'Done' }))
-      expect(within(countryPanel()!).getByText(/^Going/)).toHaveTextContent(/in 23 days$/)
-      expect(saved('plans')).toEqual({ Denmark: inDays(23) })
       expect(painted()).toEqual({ Denmark: plannedColor(DEFAULT_THEME, DEFAULT_THEME.land as string) })
       expect(outlined()).toEqual(['Denmark'])
-
-      await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
-      expect(screen.getByRole('list', { name: 'Upcoming' })).toHaveTextContent(/Denmark.*in 23 days/)
-      await userEvent.click(screen.getByRole('button', { name: 'Not going to Denmark after all' }))
-      expect(saved('plans')).toEqual({})
-      expect(outlined()).toEqual([])
-      expect(screen.getByText('Not going to Denmark')).toBeInTheDocument()
-      await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-      expect(saved('plans')).toEqual({ Denmark: inDays(23) })
+      expect(screen.getByText('0 visited')).toBeInTheDocument()
+      click(100)
+      const visits = within(within(countryPanel()!).getByRole('region', { name: 'Visits' }))
+      expect(visits.getByRole('list', { name: 'Visits' })).toHaveTextContent(new RegExp(`^Mar ${nextYear} · in \\d+ months`))
+      expect(within(countryPanel()!).getByRole('button', { name: 'Add to visited atlas' })).toBeEnabled()
     })
-
-    it('puts a place in your atlas when the day comes, with the visit, or takes it back if you did not go', async () => {
-      localStorage.setItem('countries-app.plans', JSON.stringify({ Peru: inDays(0), Japan: inDays(5) }))
-      localStorage.setItem('countries-app.wishlist', JSON.stringify(['Peru']))
+    it("counts a visit as been once its month has come", async () => {
+      const now = new Date()
+      withTrips({ items: [['Denmark', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`]] })
       render(<App />)
-      await waitFor(() => expect(saved('plans')).toEqual({ Japan: inDays(5) }))
-      expect(saved('visited')).toEqual(['Peru'])
-      expect(saved('visit-dates')).toEqual({ Peru: [inDays(0).slice(0, 7)] })
-      expect(saved('wishlist')).toEqual([])
-      expect(screen.getByText('Welcome to Peru! In your visited atlas now')).toBeInTheDocument()
-      await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-      expect(saved('visited')).toEqual([])
-      expect(saved('visit-dates')).toEqual({})
-      expect(saved('wishlist')).toEqual(['Peru'])
+      expect(painted()).toEqual({ Denmark: DEFAULT_THEME.visited })
+      expect(outlined()).toEqual([])
+      expect(screen.getByText('1 visited')).toBeInTheDocument()
     })
-
     it("draws a flight booked dashed, with no plane, and doesn't count it yet", async () => {
       const nextYear = new Date().getFullYear() + 1
       localStorage.setItem(
@@ -1049,7 +1067,6 @@ describe('App', () => {
       expect(list.getAllByRole('listitem').map((li) => li.querySelector('.row-name')!.textContent)).toEqual(['Japan', 'Peru'])
 
       await userEvent.click(list.getByRole('button', { name: 'Been to Japan: add it to your visited atlas' }))
-      expect(within(sidePanel()!).getByRole('list', { name: 'Visited in Asia' })).toHaveTextContent('Japan')
       expect(painted()).toEqual({ Japan: DEFAULT_THEME.visited, Peru: DEFAULT_THEME.wishlist })
       expect(wishes()).toEqual(['Peru'])
     })
@@ -1415,6 +1432,39 @@ describe('App', () => {
       }
     })
 
+    it('replays the trips been on, oldest first: each place colored as reached, the trip it is on standing out', async () => {
+      withTrips({ name: 'Japan', items: [['Japan', '2024-04']] }, { name: 'Nordics', items: [['Sweden', '2018-07'], ['Norway', '2018-07']] })
+      render(<App />)
+      await openFlights()
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        const { correct, visited } = DEFAULT_THEME
+        const bar = () => screen.queryByRole('status', { name: 'Replaying your trips' })
+        fireEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+        expect(bar()).toHaveTextContent('Your trips, from the first')
+        expect(painted()).toEqual({})
+        act(() => vi.advanceTimersByTime(REPLAY_LEAD_IN * 1000 + 50))
+        expect(bar()).toHaveTextContent(/^NordicsJul 20181 of 2/)
+        expect(painted()).toEqual({ Sweden: correct })
+        act(() => vi.advanceTimersByTime(REPLAY_PAUSE * 1000))
+        expect(painted()).toEqual({ Sweden: correct, Norway: correct })
+        act(() => vi.advanceTimersByTime((REPLAY_PAUSE + REPLAY_GAP) * 1000))
+        expect(bar()).toHaveTextContent(/^JapanApr 20242 of 2/)
+        expect(painted()).toEqual({ Sweden: visited, Norway: visited, Japan: correct })
+        // A moment after the last, the globe as it is again
+        act(() => vi.advanceTimersByTime(10_000))
+        expect(bar()).not.toBeInTheDocument()
+        expect(painted()).toEqual({ Sweden: visited, Norway: visited, Japan: visited })
+
+        // Stopped with Escape
+        fireEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+        fireEvent.keyDown(window, { key: 'Escape' })
+        expect(bar()).not.toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('on a phone, puts the flights away while following a trip, and brings them back at the end', async () => {
       const matchMedia = window.matchMedia
       window.matchMedia = ((query: string) => ({ matches: query.includes('max-width: 640px'), media: query })) as typeof window.matchMedia
@@ -1443,6 +1493,7 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Place' }))
       await userEvent.type(screen.getByRole('searchbox', { name: 'Place to add' }), 'thai')
       await userEvent.click(within(screen.getByRole('list', { name: 'Places found' })).getByRole('button', { name: /^Thailand/ }))
+      await userEvent.selectOptions(within(screen.getByRole('group', { name: 'When you went to Thailand' })).getByRole('combobox', { name: 'Year' }), '2024')
       await userEvent.click(screen.getByRole('button', { name: 'Add place' }))
       await userEvent.click(screen.getByRole('button', { name: 'Flight' }))
       for (const [label, query] of [['From', 'cph'], ['To', 'bkk']]) {

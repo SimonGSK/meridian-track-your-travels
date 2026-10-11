@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { countries, searchCountries, type CountryFeature } from '../countries'
 import { CONTINENTS, type Continent } from '../data/continents'
 import { flagUrl } from '../flags'
 import { CloseIcon, StarIcon } from '../icons'
-import { countdown, formatDay, type Day } from '../data/plans'
 import { countriesOf, countryOfPlace } from '../data/sovereigns'
 import { percentLabel } from './percentLabel'
 import StatsBox from '../ui/StatsBox'
@@ -18,13 +18,12 @@ type Props = {
   note?: (country: CountryFeature) => string | null
   /** Cities visited, all over the world */
   cityCount?: number
+  /** Places a trip has been to, which stay visited while it has: nothing to remove here */
+  inTrips?: ReadonlySet<string>
   /** Places you want to go, not visited yet, by name */
   wishlist?: ReadonlySet<string>
   onWish?: (name: string) => void
   onUnwish?: (name: string) => void
-  /** Visits planned, by place: the day you're going */
-  plans?: Readonly<Record<string, Day>>
-  onUnplan?: (name: string) => void
 }
 
 const byName = (a: CountryFeature, b: CountryFeature) => a.properties.name.localeCompare(b.properties.name)
@@ -36,8 +35,6 @@ const COUNTRIES_IN = new Map(
   CONTINENTS.map((continent) => [continent, countries.filter((c) => isCountry(c) && c.properties.continent === continent).length]),
 )
 const MAX_RESULTS = 6
-// No spaces: aria-controls reads spaces as separators between ids
-const placesId = (continent: Continent) => `visited-in-${continent.replace(/\s+/g, '-')}`
 
 /** A small flag in front of a place's name in a list; `named` where it stands for the place, with no name beside it */
 export function Flag({ country, named = false }: { country: CountryFeature; named?: boolean }) {
@@ -51,13 +48,11 @@ export function Flag({ country, named = false }: { country: CountryFeature; name
 const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
 const NO_WISHES: ReadonlySet<string> = new Set()
-const NO_PLANS: Readonly<Record<string, Day>> = {}
 
 export default function VisitedPanel(props: Props) {
-  const { visited, onAdd, onRemove, onShow, note, cityCount = 0, wishlist = NO_WISHES, onWish, onUnwish } = props
-  const { plans = NO_PLANS, onUnplan } = props
+  const { visited, onAdd, onRemove, onShow, note, cityCount = 0, inTrips = NO_WISHES, wishlist = NO_WISHES, onWish, onUnwish } = props
   const [query, setQuery] = useState('')
-  /** The continent whose places are listed under its bar */
+  /** The continent whose places are listed, over the rest */
   const [open, setOpen] = useState<Continent | null>(null)
 
   const visitedList = countries.filter((c) => visited.has(c.properties.name)).sort(byName)
@@ -73,21 +68,15 @@ export default function VisitedPanel(props: Props) {
   const territoriesOf = (country: CountryFeature) =>
     visitedList.filter((place) => place !== country && countryOfPlace(place) === country).map((place) => place.properties.name)
   const wishes = countries.filter((c) => wishlist.has(c.properties.name)).sort(byName)
-  // Soonest first
-  const upcoming = countries
-    .filter((c) => plans[c.properties.name])
-    .sort((a, b) => plans[a.properties.name].localeCompare(plans[b.properties.name]))
   // A second line under the name: "Territory", and states and cities visited; "In Greenland" for Denmark been to there
   const noteFor = (c: CountryFeature) =>
     throughTerritory(c)
       ? `In ${listOf(territoriesOf(c))}`
       : [isCountry(c) ? null : 'Territory', note?.(c)].filter(Boolean).join(' · ') || null
 
-  // Adding a place opens its continent, to see it there
   const add = (country: CountryFeature) => {
     onAdd(country.properties.name)
     setQuery('')
-    setOpen(country.properties.continent)
   }
   // Every continent with countries, and Antarctica too once you've been to one of its territories
   const continents = CONTINENTS.filter((continent) => COUNTRIES_IN.get(continent)! > 0 || visitedIn(continent).length > 0)
@@ -123,12 +112,11 @@ export default function VisitedPanel(props: Props) {
           // The places visited there, and the countries been to only in a territory elsewhere
           const places = [...visitedIn(continent), ...countriesHere.filter(throughTerritory)].sort(byName)
           const count = countriesHere.length
-          const isOpen = open === continent
           return (
-            <li key={continent} className={isOpen ? 'open' : undefined}>
-              {/* The whole bar opens the continent's places; the button, for the keyboard */}
-              <div className="continent-row" onClick={() => setOpen(isOpen ? null : continent)}>
-                <button type="button" className="continent-name" aria-expanded={isOpen} aria-controls={placesId(continent)}>
+            <li key={continent}>
+              {/* The whole bar opens the continent's places, over the rest; the button, for the keyboard */}
+              <div className="continent-row" onClick={() => setOpen(continent)}>
+                <button type="button" className="continent-name" aria-haspopup="dialog" aria-expanded={open === continent}>
                   {continent}
                 </button>
                 {total > 0 ? (
@@ -153,41 +141,27 @@ export default function VisitedPanel(props: Props) {
                   <span className="continent-count">{places.length === 1 ? '1 place' : `${places.length} places`}</span>
                 )}
               </div>
-              {isOpen &&
-                (places.length === 0 ? (
-                  <p id={placesId(continent)} className="muted continent-none">
-                    None yet in {continent}.
-                  </p>
-                ) : (
-                  <ul id={placesId(continent)} className="country-list continent-places" aria-label={`Visited in ${continent}`}>
-                    {places.map((c) => (
-                      <li key={c.properties.name} className="country-item">
-                        <button type="button" className="country-row" onClick={() => onShow(c)}>
-                          <Flag country={c} />
-                          <span className="row-text">
-                            <span className="row-name">{c.properties.name}</span>
-                            {noteFor(c) && <span className="row-note">{noteFor(c)}</span>}
-                          </span>
-                        </button>
-                        {/* Been to in a territory, not marked itself: nothing to remove */}
-                        {!throughTerritory(c) && (
-                          <button
-                            type="button"
-                            className="icon-button small"
-                            onClick={() => onRemove(c.properties.name)}
-                            aria-label={`Remove ${c.properties.name}`}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ))}
             </li>
           )
         })}
       </ul>
+      {open && (
+        <ContinentPopup
+          continent={open}
+          visited={[...visitedIn(open), ...been.filter((c) => c.properties.continent === open).filter(throughTerritory)].sort(byName)}
+          notVisited={countries.filter((c) => isCountry(c) && c.properties.continent === open && !been.includes(c)).sort(byName)}
+          count={been.filter((c) => c.properties.continent === open).length}
+          total={COUNTRIES_IN.get(open)!}
+          noteFor={noteFor}
+          canRemove={(c) => !throughTerritory(c) && !inTrips.has(c.properties.name)}
+          onRemove={onRemove}
+          onShow={(c) => {
+            setOpen(null)
+            onShow(c)
+          }}
+          onClose={() => setOpen(null)}
+        />
+      )}
       {visitedList.length === 0 && (
         <p className="muted">None yet. Search below, or click a country on the globe and mark it as visited.</p>
       )}
@@ -243,40 +217,6 @@ export default function VisitedPanel(props: Props) {
       )}
       {query.trim() && matches.length === 0 && <p className="muted">No matching countries.</p>}
 
-      {upcoming.length > 0 && (
-        <>
-          <h3>Upcoming</h3>
-          <ul className="country-list" aria-label="Upcoming">
-            {upcoming.map((c) => {
-              const day = plans[c.properties.name]
-              return (
-                <li key={c.properties.name} className="country-item">
-                  <button type="button" className="country-row" onClick={() => onShow(c)}>
-                    <Flag country={c} />
-                    <span className="row-text">
-                      <span className="row-name">{c.properties.name}</span>
-                      <span className="row-note">
-                        {formatDay(day)} · <strong className="countdown">{countdown(day)}</strong>
-                      </span>
-                    </span>
-                  </button>
-                  {onUnplan && (
-                    <button
-                      type="button"
-                      className="icon-button small"
-                      onClick={() => onUnplan(c.properties.name)}
-                      aria-label={`Not going to ${c.properties.name} after all`}
-                    >
-                      <CloseIcon size={14} />
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </>
-      )}
-
       {onWish && onUnwish && (
         <>
           <h3>Wishlist</h3>
@@ -320,5 +260,98 @@ export default function VisitedPanel(props: Props) {
       )}
 
     </div>
+  )
+}
+
+type PopupProps = {
+  continent: Continent
+  /** The places visited there, and countries been to only in a territory elsewhere */
+  visited: CountryFeature[]
+  /** Its countries not been to yet */
+  notVisited: CountryFeature[]
+  /** Countries been to there, of how many */
+  count: number
+  total: number
+  noteFor: (country: CountryFeature) => string | null
+  canRemove: (country: CountryFeature) => boolean
+  onRemove: (name: string) => void
+  onShow: (country: CountryFeature) => void
+  onClose: () => void
+}
+
+/**
+ * A continent's places, over the rest: those visited first, then its
+ * countries not been to yet. Closed with ×, Escape, or a click beside it.
+ */
+function ContinentPopup({ continent, visited, notVisited, count, total, noteFor, canRemove, onRemove, onShow, onClose }: PopupProps) {
+  const titleId = useId()
+  // Escape closes it, before anything else
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      onClose()
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [onClose])
+  /** A place: its flag and name, and for one visited, what's noted about it and whether it can be removed */
+  const row = (c: CountryFeature, been: boolean) => (
+    <li key={c.properties.name} className="country-item">
+      <button type="button" className="country-row" onClick={() => onShow(c)}>
+        <Flag country={c} />
+        <span className="row-text">
+          <span className="row-name">{c.properties.name}</span>
+          {been && noteFor(c) && <span className="row-note">{noteFor(c)}</span>}
+        </span>
+      </button>
+      {been && canRemove(c) && (
+        <button type="button" className="icon-button small" onClick={() => onRemove(c.properties.name)} aria-label={`Remove ${c.properties.name}`}>
+          ×
+        </button>
+      )}
+    </li>
+  )
+  return createPortal(
+    <div className="popup-backdrop" onClick={onClose}>
+      <section className="card popup" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
+        <header className="card-header">
+          <h3 id={titleId} className="card-label">
+            {continent}
+          </h3>
+          {total > 0 && (
+            <span className="card-meta">
+              {count} / {total}
+            </span>
+          )}
+          <button type="button" className="close-button" onClick={onClose} aria-label="Close" autoFocus>
+            <CloseIcon />
+          </button>
+        </header>
+        <div className="popup-body">
+          <h3>
+            Visited <span className="row-meta">{visited.length}</span>
+          </h3>
+          {visited.length === 0 ? (
+            <p className="muted continent-none">None yet in {continent}.</p>
+          ) : (
+            <ul className="country-list continent-places" aria-label={`Visited in ${continent}`}>
+              {visited.map((c) => row(c, true))}
+            </ul>
+          )}
+          {notVisited.length > 0 && (
+            <>
+              <h3>
+                Not yet <span className="row-meta">{notVisited.length}</span>
+              </h3>
+              <ul className="country-list continent-places not-yet" aria-label={`Not yet in ${continent}`}>
+                {notVisited.map((c) => row(c, false))}
+              </ul>
+            </>
+          )}
+        </div>
+      </section>
+    </div>,
+    document.body,
   )
 }

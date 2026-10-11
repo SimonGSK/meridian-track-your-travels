@@ -42,7 +42,9 @@ const NONE: readonly VisitDate[] = []
 
 /**
  * When you went to each country, by name: several visits, each a month or
- * a year, each with a note if you like, saved in this browser.
+ * a year, each with a note if you like, saved in this browser. Visits are
+ * made in trips now, so the dates saved here are from before: they become
+ * trips (see tripsOfVisits) and are let go, and the notes stay.
  */
 export function useVisitDates() {
   const [saved, setSaved] = usePersistentState<VisitDates>(VISIT_DATES_KEY, {}, isVisitDates)
@@ -83,5 +85,7 @@ export function useVisitDates() {
     },
     [setNotes],
   )
-  return { datesOf, addVisit, removeVisit, noteOf, setNote }
+  /** Lets the dates go, once they're in trips; the notes stay */
+  const clearDates = useCallback(() => setSaved({}), [setSaved])
+  return { datesOf, addVisit, removeVisit, noteOf, setNote, clearDates }
 }

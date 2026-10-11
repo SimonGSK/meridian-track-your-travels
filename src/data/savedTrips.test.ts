@@ -4,13 +4,17 @@ import type { Route } from './flights'
 import {
   isSavedTrips,
   itemKey,
+  joinTrips,
   journeysOf,
   looseOf,
   placeFor,
   placesOf,
   tripViewsOf,
   tripsFromFlights,
+  tripsOfVisits,
+  visitsInTrips,
   visitsOf,
+  visitsOfPlans,
   type SavedTrip,
   type TripItem,
 } from './savedTrips'
@@ -54,12 +58,6 @@ describe('isSavedTrips', () => {
 })
 
 describe('tripViewsOf', () => {
-  const visits = [
-    { place: 'Japan', date: '2024-04' },
-    { place: 'South Korea', date: '2024-04' },
-    { place: 'United Kingdom', date: '2017-11' },
-  ]
-
   it('has each trip with its flights, when it was and how far, newest first, those without a date last', () => {
     const views = tripViewsOf(
       [
@@ -67,7 +65,6 @@ describe('tripViewsOf', () => {
         trip('empty', []),
         trip('asia', [flight('a'), visit('Japan', '2024-04'), flight('b'), visit('South Korea', '2024-04'), flight('c')]),
       ],
-      visits,
       asia,
     )
     expect(views.map((v) => v.trip.id)).toEqual(['asia', 'old', 'empty'])
@@ -75,29 +72,77 @@ describe('tripViewsOf', () => {
     expect([views[0].date, views[0].endDate, views[0].km]).toEqual(['2024-04', '2024-05', 18_800])
   })
 
-  it("leaves out what's no longer there, and a visit or flight in more than one trip from all but the first", () => {
+  it('leaves out flights no longer there, and a visit or flight in more than one trip from all but the first', () => {
     const views = tripViewsOf(
       [trip('one', [visit('Japan', '2024-04'), visit('Japan', '2019'), flight('gone')]), trip('two', [visit('Japan', '2024-04'), flight('a')])],
-      visits,
       asia,
     )
-    expect(views.find((v) => v.trip.id === 'one')!.items).toEqual([visit('Japan', '2024-04')])
+    expect(views.find((v) => v.trip.id === 'one')!.items).toEqual([visit('Japan', '2024-04'), visit('Japan', '2019')])
     expect(views.find((v) => v.trip.id === 'two')!.items).toEqual([flight('a')])
+    expect(visitsInTrips(views)).toEqual([
+      { place: 'Japan', date: '2024-04' },
+      { place: 'Japan', date: '2019' },
+    ])
   })
 })
 
 describe('looseOf', () => {
-  it('has the visits in no trip, newest first and those without a date last, and the flights in none', () => {
-    const visits = [
-      { place: 'Denmark', date: null },
-      { place: 'Japan', date: '2024-04' },
-      { place: 'Kenya', date: '2024' },
-      { place: 'Sweden', date: '2023-12' },
-    ]
-    const views = tripViewsOf([trip('t', [visit('Japan', '2024-04'), flight('a')])], visits, asia)
-    const loose = looseOf(views, visits, asia)
-    expect(loose.visits.map((v) => v.place)).toEqual(['Kenya', 'Sweden', 'Denmark'])
+  it('has the places marked visited that no trip went to, each once, by name, and the flights in none', () => {
+    const views = tripViewsOf([trip('t', [visit('Japan', '2024-04'), flight('a')])], asia)
+    const loose = looseOf(views, ['Sweden', 'Japan', 'Denmark'], asia)
+    expect(loose.places).toEqual(['Denmark', 'Sweden'])
     expect(loose.flights.map((r) => r.flight.id)).toEqual(['b', 'c'])
+  })
+})
+
+describe('what there was before visits were only made in trips', () => {
+  const ids = () => {
+    let n = 0
+    return () => `new-${++n}`
+  }
+
+  it("puts a visit in a trip whose flight lands there within a month, where it fits, and gives back the others", () => {
+    const made = [trip('asia', [flight('a'), flight('b'), flight('c')])]
+    const { trips, rest } = joinTrips(
+      made,
+      [
+        { place: 'South Korea', date: '2024-05' },
+        { place: 'Japan', date: '2019' },
+        { place: 'Kenya', date: '2024-04' },
+      ],
+      asia,
+    )
+    expect(trips[0].items).toEqual([flight('a'), flight('b'), visit('South Korea', '2024-05'), flight('c')])
+    expect(made[0].items).toHaveLength(3) // left as it was
+    expect(rest).toEqual([
+      { place: 'Japan', date: '2019' },
+      { place: 'Kenya', date: '2024-04' },
+    ])
+  })
+
+  it('makes a trip a month of the dated visits in none, oldest first', () => {
+    const trips = tripsOfVisits(
+      [trip('t', [visit('Japan', '2024-04')])],
+      [
+        { place: 'Japan', date: '2024-04' }, // in a trip already
+        { place: 'Kenya', date: '2024-04' },
+        { place: 'Sweden', date: '2019' },
+        { place: 'Norway', date: '2024-04' },
+        { place: 'Denmark', date: null }, // marked visited, no date: in no trip
+      ],
+      ids(),
+    )
+    expect(trips).toEqual([
+      { id: 'new-1', name: '', items: [visit('Sweden', '2019')] },
+      { id: 'new-2', name: '', items: [visit('Kenya', '2024-04'), visit('Norway', '2024-04')] },
+    ])
+  })
+
+  it('makes visits of plans, in the month of their day, soonest first', () => {
+    expect(visitsOfPlans({ Chile: '2027-03-02', India: '2026-11-20' })).toEqual([
+      { place: 'India', date: '2026-11' },
+      { place: 'Chile', date: '2027-03' },
+    ])
   })
 })
 

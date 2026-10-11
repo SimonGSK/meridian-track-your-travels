@@ -10,7 +10,10 @@ type Plans = Record<string, Day>
 export const isPlans = (value: unknown): value is Plans =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && Object.values(value).every(isDay)
 
-/** Visits you're planning, one per place, saved in this browser until the day comes (see App) */
+/**
+ * Visits planned, one per place, as they were saved before trips to come
+ * could be made: they become trips (see tripsOfPlans), and are let go
+ */
 export function usePlans() {
   const [plans, setPlans] = usePersistentState<Plans>(PLANS_KEY, {}, isPlans)
   /** Plans a visit for a day, or with null, no longer */
@@ -23,7 +26,9 @@ export function usePlans() {
       }),
     [setPlans],
   )
-  return { plans, setPlan }
+  /** Lets them all go, once they're trips */
+  const clear = useCallback(() => setPlans({}), [setPlans])
+  return { plans, setPlan, clear }
 }
 
 /** How often to look whether the day has changed: a sleeping computer's timers don't run */

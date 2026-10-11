@@ -1,15 +1,17 @@
 import { countryOf } from './airports'
 import type { Route } from './flights'
 import { tripsOf } from './trips'
+import { monthOf, type Day } from './plans'
 import { isVisitDate, newestFirst, partsOf, type VisitDate } from './visitDates'
 
 /**
  * Trips as you make them: your visits and flights, in the order you went,
  * with a name. A visit is a place and when you went there (a month or a
- * year), or no date for a place you've been to, when unknown. Each visit and
- * each flight is in one trip at most. The dates and flights themselves stay
- * where they're kept (useVisitDates, useFlights): a trip says which, in what
- * order.
+ * year), or no date for one when unknown; trips are the only record of
+ * visits, so a place's dates are those of its visits in trips. Each flight
+ * is in one trip at most, and stays where it's kept (useFlights): a trip
+ * says which, in what order. A visit in a month still to come is a trip
+ * you're going on.
  */
 export type TripItem = { kind: 'visit'; place: string; date: VisitDate | null } | { kind: 'flight'; flight: string }
 
@@ -76,20 +78,17 @@ export type TripView = {
 }
 
 /**
- * The trips as they stand, newest first: what's no longer there left out
- * (a place taken off the atlas, a visit's date removed, a flight removed),
+ * The trips as they stand, newest first: flights no longer there left out,
  * and each visit and flight in the first trip it's in only. Trips without
  * a date come last, the newest made first.
  */
-export function tripViewsOf(trips: readonly SavedTrip[], visits: readonly Visit[], routes: readonly Route[]): TripView[] {
-  const there = new Set(visits.map((visit) => itemKey(visitItem(visit))))
+export function tripViewsOf(trips: readonly SavedTrip[], routes: readonly Route[]): TripView[] {
   const routeOf = new Map(routes.map((route) => [route.flight.id, route]))
   const placed = new Set<string>()
   const views = trips.map((trip, made) => {
     const items = trip.items.filter((item) => {
       const key = itemKey(item)
-      const live = item.kind === 'visit' ? there.has(key) : routeOf.has(item.flight)
-      if (!live || placed.has(key)) return false
+      if ((item.kind === 'flight' && !routeOf.has(item.flight)) || placed.has(key)) return false
       placed.add(key)
       return true
     })
@@ -115,11 +114,16 @@ export function tripViewsOf(trips: readonly SavedTrip[], visits: readonly Visit[
   return [...dated, ...views.filter(({ view }) => !view.date).reverse()].map(({ view }) => view)
 }
 
-/** What no trip has yet: visits newest first (those without a date last), and flights in the order added */
-export function looseOf(views: readonly TripView[], visits: readonly Visit[], routes: readonly Route[]) {
+/** Every visit in a trip, each once */
+export const visitsInTrips = (views: readonly TripView[]): Visit[] =>
+  views.flatMap((view) => view.items.flatMap((item) => (item.kind === 'visit' ? [{ place: item.place, date: item.date }] : [])))
+
+/** What no trip has yet: the places marked visited that no trip went to, by name, and the flights in none, in the order added */
+export function looseOf(views: readonly TripView[], marked: Iterable<string>, routes: readonly Route[]) {
   const inTrips = new Set(views.flatMap((view) => view.items.map(itemKey)))
+  const placesInTrips = new Set(visitsInTrips(views).map((visit) => visit.place))
   return {
-    visits: visits.filter((visit) => !inTrips.has(itemKey(visitItem(visit)))).sort(byWhen),
+    places: [...marked].filter((place) => !placesInTrips.has(place)).sort((a, b) => a.localeCompare(b)),
     flights: routes.filter((route) => !inTrips.has(itemKey({ kind: 'flight', flight: route.flight.id }))),
   }
 }
@@ -215,6 +219,60 @@ export function tripsFromFlights(
     return { id: newId(), name: named?.name ?? '', ...(named?.note ? { note: named.note } : {}), items }
   })
 }
+
+/**
+ * Visits in no trip yet that go with one: where one of its flights lands
+ * in the place within a month of the visit. Gives the trips with them put
+ * in, where they fit, and the visits left over.
+ */
+export function joinTrips(trips: readonly SavedTrip[], visits: readonly Visit[], routes: readonly Route[]) {
+  const routeOf = new Map(routes.map((route) => [route.flight.id, route]))
+  const inTrips = new Set(trips.flatMap((trip) => trip.items.map(itemKey)))
+  const joined = trips.map((trip) => ({ ...trip, items: [...trip.items] }))
+  const rest: Visit[] = []
+  for (const visit of visits) {
+    const item = visitItem(visit)
+    if (inTrips.has(itemKey(item))) continue
+    const trip =
+      visit.date &&
+      joined.find((t) =>
+        t.items.some((other) => {
+          const route = other.kind === 'flight' ? routeOf.get(other.flight) : undefined
+          return !!route?.flight.date && countryOf(route.to) === visit.place && closeInTime(route.flight.date, visit.date!)
+        }),
+      )
+    if (!trip) {
+      rest.push(visit)
+      continue
+    }
+    inTrips.add(itemKey(item))
+    trip.items.splice(placeFor(item, trip.items, routes), 0, item)
+  }
+  return { trips: joined, rest }
+}
+
+/**
+ * Trips for dated visits in none, from before visits were only made in
+ * trips: those of the same month (or year, for one with only the year) in
+ * one trip, without a name, to name, join or split as you like
+ */
+export function tripsOfVisits(trips: readonly SavedTrip[], visits: readonly Visit[], newId: () => string): SavedTrip[] {
+  const inTrips = new Set(trips.flatMap((trip) => trip.items.map(itemKey)))
+  const byWhen = new Map<VisitDate, TripItem[]>()
+  for (const visit of visits) {
+    const item = visitItem(visit)
+    if (!visit.date || inTrips.has(itemKey(item))) continue
+    inTrips.add(itemKey(item))
+    byWhen.set(visit.date, [...(byWhen.get(visit.date) ?? []), item])
+  }
+  return [...byWhen.keys()].sort().map((date) => ({ id: newId(), name: '', items: byWhen.get(date)! }))
+}
+
+/** The visits planned before trips to come could be made: to each place, in the month of its day */
+export const visitsOfPlans = (plans: Readonly<Record<string, Day>>): Visit[] =>
+  Object.entries(plans)
+    .sort(([, a], [, b]) => a.localeCompare(b))
+    .map(([place, day]) => ({ place, date: monthOf(day) }))
 
 /**
  * Your flights as they were flown, for the planes on the globe: each trip's

@@ -3,7 +3,7 @@ import { countries, searchCountries, type CountryFeature } from '../countries'
 import { cityOf, type Airport } from '../data/airports'
 import { flightStats, formatDistance, type Route } from '../data/flights'
 import { countdown, isToCome } from '../data/plans'
-import { countriesOfTrip, itemKey, placeFor, titleOf, visitItem, type TripItem, type TripView, type Visit } from '../data/savedTrips'
+import { countriesOfTrip, itemKey, placeFor, titleOf, type TripItem, type TripView, type Visit } from '../data/savedTrips'
 import { formatVisitDate, partsOf, type VisitDate } from '../data/visitDates'
 import { CloseIcon, GripIcon, PencilIcon, PlaneIcon, PlayIcon, PlusIcon } from '../icons'
 import StatsBox from '../ui/StatsBox'
@@ -40,21 +40,24 @@ export type TripActions = {
 type Props = {
   /** The trips, newest first */
   trips: TripView[]
-  /** Visits and flights in no trip */
-  loose: { visits: Visit[]; flights: Route[] }
+  /** Places marked visited that no trip went to, and flights in no trip */
+  loose: { places: string[]; flights: Route[] }
   /** Every flight, those to come too */
   routes: Route[]
   /** The flights flown, which count */
   flown: Route[]
   airports: Airport[] | null
-  /** When each place was visited, newest first */
-  datesOf: (place: string) => readonly VisitDate[]
   actions: TripActions
+  /** The trip open, to see and change what's in it */
+  open: string | null
+  onOpen: (id: string | null) => void
   onShowTrip: (trip: TripView) => void
   onShowRoute: (route: Route) => void
   onShowPlace: (country: CountryFeature) => void
   /** Follows a trip on the globe, flight by flight */
   onFollowTrip?: (routes: Route[]) => void
+  /** Replays every trip been on, from the first, on the globe */
+  onReplay?: () => void
 }
 
 const placeNamed = new Map(countries.map((c) => [c.properties.name, c]))
@@ -75,18 +78,21 @@ function whenOf(date: VisitDate | null, end: VisitDate | null) {
  * a name; below them, what's in no trip yet, ready to date or put in one.
  */
 export default function TripsPanel(props: Props) {
-  const { trips, loose, routes, flown, airports, datesOf, actions, onShowTrip, onShowRoute, onShowPlace, onFollowTrip } = props
-  /** The trip opened, to see and change what's in it */
-  const [open, setOpen] = useState<string | null>(null)
+  const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onFollowTrip, onReplay } = props
   const [naming, setNaming] = useState<string | null>(null)
   const [making, setMaking] = useState(false)
   const { flights, km, aroundEarth } = flightStats(flown)
-  const looseCount = loose.visits.length + loose.flights.length
+  const looseCount = loose.places.length + loose.flights.length
+
+  // A trip opened from elsewhere (a place's visits) comes into view
+  useEffect(() => {
+    if (open) document.querySelector(`[data-trip="${CSS.escape(open)}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [open])
 
   /** A new trip, opened, with what's to go in it; named straight away */
   const make = (name: string, items: TripItem[] = []) => {
     const id = actions.create(name, items)
-    setOpen(id)
+    onOpen(id)
     if (!name) setNaming(id)
   }
   /** Puts something in no trip into one, where it fits there */
@@ -119,6 +125,11 @@ export default function TripsPanel(props: Props) {
           <button type="button" className="primary-button" onClick={() => setMaking(true)}>
             <PlusIcon size={14} /> New trip
           </button>
+          {onReplay && (
+            <button type="button" className="link-button replay-trips" onClick={onReplay}>
+              <PlayIcon size={13} /> Replay your trips
+            </button>
+          )}
         </div>
       )}
 
@@ -134,10 +145,9 @@ export default function TripsPanel(props: Props) {
               view={view}
               routes={routes}
               airports={airports}
-              datesOf={datesOf}
               actions={actions}
               isOpen={open === view.trip.id}
-              onToggle={() => setOpen(open === view.trip.id ? null : view.trip.id)}
+              onToggle={() => onOpen(open === view.trip.id ? null : view.trip.id)}
               naming={naming === view.trip.id}
               onNaming={(on) => setNaming(on ? view.trip.id : null)}
               onShow={() => onShowTrip(view)}
@@ -156,16 +166,10 @@ export default function TripsPanel(props: Props) {
         <p className="muted">Everything you've been to is in a trip.</p>
       ) : (
         <ul className="country-list loose-list" aria-label="Not in a trip yet">
-          {loose.visits.map((visit) => (
-            <VisitRow
-              key={itemKey(visitItem(visit))}
-              visit={visit}
-              datesOf={datesOf}
-              onShow={onShowPlace}
-              onDate={(date) => actions.redateVisit(visit.place, visit.date, date)}
-            >
-              <TripPicker trips={trips} what={visit.place} onPick={(id) => putIn(id, visitItem(visit))} />
-            </VisitRow>
+          {loose.places.map((place) => (
+            <PlaceRow key={place} place={place} onShow={onShowPlace}>
+              <TripPicker trips={trips} what={place} onPick={(id) => putIn(id, { kind: 'visit', place, date: null })} />
+            </PlaceRow>
           ))}
           {loose.flights.map((route) => (
             <FlightRow
@@ -248,7 +252,6 @@ type CardProps = {
   view: TripView
   routes: Route[]
   airports: Airport[] | null
-  datesOf: (place: string) => readonly VisitDate[]
   actions: TripActions
   isOpen: boolean
   onToggle: () => void
@@ -261,7 +264,7 @@ type CardProps = {
 }
 
 /** A trip: its name and when, and opened, its places and flights in order, to rearrange, date and add to */
-function TripCard({ view, routes, airports, datesOf, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onFollow }: CardProps) {
+function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onFollow }: CardProps) {
   const { trip, items, date, endDate } = view
   const [adding, setAdding] = useState<'place' | 'flight' | null>(null)
   const title = titleOf(view)
@@ -285,7 +288,7 @@ function TripCard({ view, routes, airports, datesOf, actions, isOpen, onToggle, 
   })
 
   return (
-    <li className={`trip${isOpen ? ' open' : ''}`}>
+    <li className={`trip${isOpen ? ' open' : ''}`} data-trip={trip.id}>
       <div className="trip-top">
         <button type="button" className="trip-header" aria-expanded={isOpen} onClick={onToggle}>
           {meta && <span className="trip-meta">{meta}</span>}
@@ -386,7 +389,6 @@ function TripCard({ view, routes, airports, datesOf, actions, isOpen, onToggle, 
                   <VisitRow
                     key={key}
                     visit={item}
-                    datesOf={datesOf}
                     style={styleOf(i)}
                     grip={handle}
                     onShow={onShowPlace}
@@ -418,7 +420,6 @@ function TripCard({ view, routes, airports, datesOf, actions, isOpen, onToggle, 
           )}
           {adding === 'place' && (
             <AddPlace
-              datesOf={datesOf}
               defaultDate={endDate}
               onAdd={(place, when) => {
                 actions.addPlace(trip.id, place, when, placeFor({ kind: 'visit', place, date: when }, items, routes))
@@ -467,7 +468,6 @@ function TripCard({ view, routes, airports, datesOf, actions, isOpen, onToggle, 
 
 type VisitRowProps = {
   visit: Visit
-  datesOf: (place: string) => readonly VisitDate[]
   style?: CSSProperties
   grip?: ReactNode
   onShow: (country: CountryFeature) => void
@@ -475,14 +475,12 @@ type VisitRowProps = {
   children?: ReactNode
 }
 
-/** A visit: the place's flag and name, when, which can be changed, and what's done to it */
-function VisitRow({ visit, datesOf, style, grip, onShow, onDate, children }: VisitRowProps) {
+/** A visit: the place's flag and name, when (still to come, perhaps), which can be changed, and what's done to it */
+function VisitRow({ visit, style, grip, onShow, onDate, children }: VisitRowProps) {
   const { place, date } = visit
   const [editing, setEditing] = useState(false)
   const [when, setWhen] = useState<VisitDate | null>(date)
   const country = placeNamed.get(place)
-  // Only a place's one visit can be left without a date: it's been to, when unknown
-  const optional = datesOf(place).length <= 1
   return (
     <li className={`country-item trip-item${editing ? ' editing' : ''}`} style={style}>
       {grip}
@@ -507,11 +505,11 @@ function VisitRow({ visit, datesOf, style, grip, onShow, onDate, children }: Vis
       {children}
       {editing && (
         <div className="flight-date-editor">
-          <MonthYearSelect label={`When you went to ${place}`} value={date} onChange={setWhen} optional={optional} />
+          <MonthYearSelect label={`When you went to ${place}`} value={date} onChange={setWhen} future />
           <button
             type="button"
             className="link-button"
-            disabled={!optional && !when}
+            disabled={!when}
             onClick={() => {
               if (when !== date) onDate(when)
               setEditing(false)
@@ -521,6 +519,22 @@ function VisitRow({ visit, datesOf, style, grip, onShow, onDate, children }: Vis
           </button>
         </div>
       )}
+    </li>
+  )
+}
+
+/** A place marked visited that no trip went to: its flag and name, and what's done to it */
+function PlaceRow({ place, onShow, children }: { place: string; onShow: (country: CountryFeature) => void; children: ReactNode }) {
+  const country = placeNamed.get(place)
+  return (
+    <li className="country-item trip-item">
+      <button type="button" className="country-row" onClick={() => country && onShow(country)}>
+        {country && <Flag country={country} />}
+        <span className="row-text">
+          <span className="row-name">{place}</span>
+        </span>
+      </button>
+      {children}
     </li>
   )
 }
@@ -582,9 +596,8 @@ function FlightRow({ route, style, grip, onShow, onDate, onRemove, children }: F
   )
 }
 
-/** A place to add to a trip, found by name, and when you went */
-function AddPlace({ datesOf, defaultDate, onAdd, onCancel }: {
-  datesOf: (place: string) => readonly VisitDate[]
+/** A place to add to a trip, found by name, and when you went, or will */
+function AddPlace({ defaultDate, onAdd, onCancel }: {
   defaultDate: VisitDate | null
   onAdd: (place: string, date: VisitDate | null) => void
   onCancel: () => void
@@ -593,14 +606,12 @@ function AddPlace({ datesOf, defaultDate, onAdd, onCancel }: {
   const [place, setPlace] = useState<CountryFeature | null>(null)
   const [when, setWhen] = useState<VisitDate | null>(defaultDate)
   const matches = query && !place ? searchCountries(query, undefined, 5) : []
-  // A place with dates already needs one: without, it'd be the visit when no one knows, which it hasn't
-  const needsDate = !!place && datesOf(place.properties.name).length > 0
   return (
     <form
       className="trip-add"
       onSubmit={(e) => {
         e.preventDefault()
-        if (place && (when || !needsDate)) onAdd(place.properties.name, when)
+        if (place && when) onAdd(place.properties.name, when)
       }}
     >
       {place ? (
@@ -639,12 +650,12 @@ function AddPlace({ datesOf, defaultDate, onAdd, onCancel }: {
       )}
       {place && (
         <div className="city-choice">
-          <span className="city-choice-label">When{needsDate ? '' : ' (optional)'}</span>
-          <MonthYearSelect label={`When you went to ${place.properties.name}`} value={when} onChange={setWhen} optional />
+          <span className="city-choice-label">When</span>
+          <MonthYearSelect label={`When you went to ${place.properties.name}`} value={when} onChange={setWhen} future />
         </div>
       )}
       <div className="card-actions">
-        <button type="submit" className="primary-button" disabled={!place || (needsDate && !when)}>
+        <button type="submit" className="primary-button" disabled={!place || !when}>
           Add place
         </button>
         <button type="button" className="link-button" onClick={onCancel}>
@@ -671,7 +682,7 @@ function AddFlight({ airports, from: start, defaultDate, onAdd, onDone }: {
       className="flight-form trip-add"
       onSubmit={(e) => {
         e.preventDefault()
-        if (!from || !to || from === to) return
+        if (!from || !to || from === to || !when) return
         onAdd(from, to, when)
         setFrom(to)
         setTo(null)
@@ -693,11 +704,11 @@ function AddFlight({ airports, from: start, defaultDate, onAdd, onDone }: {
       </button>
       <AirportSearch label="To" airports={airports} value={to} onChange={setTo} />
       <div className="city-choice">
-        <span className="city-choice-label">When (optional)</span>
-        <MonthYearSelect label="When you flew" value={when} onChange={setWhen} optional future />
+        <span className="city-choice-label">When</span>
+        <MonthYearSelect label="When you flew" value={when} onChange={setWhen} future />
       </div>
       <div className="card-actions">
-        <button type="submit" className="primary-button" disabled={!from || !to || from === to}>
+        <button type="submit" className="primary-button" disabled={!from || !to || from === to || !when}>
           Add flight
         </button>
         <button type="button" className="link-button" onClick={onDone}>

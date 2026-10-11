@@ -15,7 +15,7 @@ const search = () => screen.getByRole('searchbox', { name: 'Add a country' })
 /** A figure in the stats box */
 const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).nextElementSibling
 const results = () => screen.queryByRole('list', { name: 'Search results' })
-/** Opens, or closes, a continent's places */
+/** Opens a continent's places, over the rest */
 const toggle = (continent: string) => userEvent.click(screen.getByRole('button', { name: continent }))
 /** The places listed under a continent's bar */
 const listed = (continent: string) =>
@@ -70,22 +70,34 @@ describe('VisitedPanel', () => {
     expect(screen.getByText(/None yet/)).toBeInTheDocument()
   })
 
-  it("lists a continent's places under its bar, alphabetically, one continent at a time", async () => {
+  it("opens a continent's places over the rest: those visited, then its countries not yet; closed again", async () => {
     setup(['Japan', 'Denmark', 'Brazil', 'Sweden', 'Argentina'])
-    expect(screen.queryByRole('list', { name: /^Visited in/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await toggle('Europe')
+    expect(screen.getByRole('dialog', { name: 'Europe' })).toHaveTextContent('2 / 46')
     expect(listed('Europe')).toEqual(['Denmark', 'Sweden'])
+    const notYet = within(screen.getByRole('list', { name: 'Not yet in Europe' })).getAllByRole('listitem')
+    expect(notYet).toHaveLength(44)
+    expect(notYet.map((li) => li.textContent)).toContain('Norway')
     expect(screen.getByRole('button', { name: 'Europe' })).toHaveAttribute('aria-expanded', 'true')
-    await toggle('South America')
-    expect(listed('South America')).toEqual(['Argentina', 'Brazil'])
-    expect(screen.queryByRole('list', { name: 'Visited in Europe' })).not.toBeInTheDocument()
-    await toggle('South America')
-    expect(screen.queryByRole('list', { name: /^Visited in/ })).not.toBeInTheDocument()
-    // The bar itself opens it too
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // The bar itself opens it too, and Escape closes it
     await userEvent.click(screen.getByRole('progressbar', { name: 'Asia: 1 of 48 countries' }))
     expect(listed('Asia')).toEqual(['Japan'])
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await toggle('Africa')
     expect(screen.getByText('None yet in Africa.')).toBeInTheDocument()
+  })
+
+  it('has nothing to remove for a place a trip has been to', async () => {
+    render(
+      <VisitedPanel visited={new Set(['Denmark', 'Sweden'])} inTrips={new Set(['Sweden'])} onAdd={vi.fn()} onRemove={vi.fn()} onShow={vi.fn()} />,
+    )
+    await toggle('Europe')
+    expect(screen.getByRole('button', { name: 'Remove Denmark' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove Sweden' })).not.toBeInTheDocument()
   })
 
   it("shows Antarctica, which has no countries, once you've been to one of its territories", async () => {
@@ -99,11 +111,11 @@ describe('VisitedPanel', () => {
     expect(listed('Antarctica')).toEqual([expect.stringContaining(antarctic.properties.name)])
   })
 
-  it('opens the continent of a place added, to see it there', async () => {
+  it('adds the place found', async () => {
     const { onAdd } = setup(['Denmark'])
     await userEvent.type(search(), 'peru{Enter}')
     expect(onAdd).toHaveBeenCalledWith('Peru')
-    expect(screen.getByRole('button', { name: 'South America' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('notes how many states and cities of a country are visited', async () => {
@@ -196,11 +208,15 @@ describe('VisitedPanel', () => {
     expect(onRemove).toHaveBeenCalledWith('Denmark')
   })
 
-  it('shows a country on the globe when clicked', async () => {
+  it('shows a country on the globe when clicked, visited or not yet, closing the list', async () => {
     const { onShow } = setup(['Denmark'])
     await toggle('Europe')
     await userEvent.click(screen.getByRole('button', { name: 'Denmark' }))
     expect(onShow).toHaveBeenCalledWith(countries.find((c) => c.properties.name === 'Denmark'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await toggle('Europe')
+    await userEvent.click(screen.getByRole('button', { name: 'Norway' }))
+    expect(onShow).toHaveBeenLastCalledWith(countries.find((c) => c.properties.name === 'Norway'))
   })
 })
 
