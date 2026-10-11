@@ -54,6 +54,14 @@ describe('CityPlay', () => {
     expect(feedback()).toHaveClass('correct')
   })
 
+  it('cheers a click in a big city, farther from its center', () => {
+    const game = newCityGame('easy', [{ ...CITIES[0], radiusKm: 30 }], () => 0, 0)
+    const { lat, lng } = game.rounds[0].city
+    play(guessCity(game, { lat: lat + 0.22, lng })) // about 24 km north
+    expect(feedback()).toHaveTextContent(/^In Canberra! 2\d km from its center\. \+100 points$/)
+    expect(feedback()).toHaveClass('correct')
+  })
+
   it("shows where it is after \"I don't know\"", async () => {
     const game = start()
     const { onDontKnow } = play(game)

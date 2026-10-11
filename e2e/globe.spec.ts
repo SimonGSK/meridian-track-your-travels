@@ -655,7 +655,7 @@ test.describe('games', () => {
 
     const box = (await page.locator('.globe canvas').boundingBox())!
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
-    await expect(feedback(page)).toHaveText(/^(Off by [\d,]+ km|Spot on! \d+ km away)\. \+\d+ points?$/)
+    await expect(feedback(page)).toHaveText(/^(Off by [\d,]+ km|Spot on! \d+ km away|In .+! \d+ km from its center)\. \+\d+ points?$/)
     await page.getByRole('button', { name: 'Next' }).click()
     await expect(page.getByText('Round 2 of 10')).toBeVisible()
     // The pin, the line and the plane drew without complaints
