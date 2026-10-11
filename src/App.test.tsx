@@ -1042,7 +1042,7 @@ describe('App', () => {
       expect(booked).toHaveTextContent(/^Mar \d{4} · in \d+ months$/)
       expect(within(booked).getByRole('img', { name: 'Japan' })).toBeInTheDocument()
     })
-    it('leaves trips to come off the globe while switched off, and the flights taken while those are', async () => {
+    it("leaves trips to come's flights and visits off the globe while switched off, each on its own, and the flights taken", async () => {
       const nextYear = new Date().getFullYear() + 1
       localStorage.setItem(
         'countries-app.flights',
@@ -1052,10 +1052,15 @@ describe('App', () => {
         ]),
       )
       withTrips({ items: [['Denmark', `${nextYear}-03`]] })
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showFutureTrips: false }))
-      render(<App />)
       const lines = () => ((flightLayer.show.mock.calls.at(-1)?.[0] ?? []) as { key: string }[]).map((line) => line.key)
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showFutureFlights: false }))
+      render(<App />)
       await waitFor(() => expect(lines()).toEqual(['a']))
+      expect(outlined()).toEqual(['Denmark'])
+      cleanup()
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showFutureVisits: false }))
+      render(<App />)
+      await waitFor(() => expect(lines()).toEqual(['a', 'upcoming-b']))
       expect(painted()).toEqual({})
       expect(outlined()).toEqual([])
       cleanup()
