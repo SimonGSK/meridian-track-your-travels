@@ -4,7 +4,7 @@ import { countries, searchCountries, type CountryFeature } from '../countries'
 import { CONTINENTS, type Continent } from '../data/continents'
 import { flagUrl } from '../flags'
 import { CheckIcon, CloseIcon, StarIcon } from '../icons'
-import { countriesOf, countryOfPlace } from '../data/sovereigns'
+import { countriesOf, countryOfPlace, territoriesOf } from '../data/sovereigns'
 import { percentLabel } from './percentLabel'
 import StatsBox from '../ui/StatsBox'
 import { noAutofill } from '../ui/noAutofill'
@@ -30,9 +30,20 @@ const byName = (a: CountryFeature, b: CountryFeature) => a.properties.name.local
 const isCountry = (c: CountryFeature) => c.properties.kind === 'country'
 const COUNTRY_COUNT = countries.filter(isCountry).length
 const TERRITORY_COUNT = countries.length - COUNTRY_COUNT
-/** Countries per continent; Antarctica has none, so it gets no row */
+/** Countries per continent; Antarctica has none, so its places are counted instead */
 const COUNTRIES_IN = new Map(
   CONTINENTS.map((continent) => [continent, countries.filter((c) => isCountry(c) && c.properties.continent === continent).length]),
+)
+/**
+ * The places listed under a continent: its countries, and the territories
+ * that are no country's, like Antarctica. Every other territory is listed
+ * under its country, as the Faroe Islands are under Denmark.
+ */
+const PLACES_IN = new Map(
+  CONTINENTS.map((continent) => [
+    continent,
+    countries.filter((c) => c.properties.continent === continent && (isCountry(c) || !countryOfPlace(c))).sort(byName),
+  ]),
 )
 const MAX_RESULTS = 6
 
@@ -59,27 +70,25 @@ export default function VisitedPanel(props: Props) {
   const notVisited = countries.filter((c) => !visited.has(c.properties.name))
   const matches = searchCountries(query, notVisited, MAX_RESULTS)
   // The countries been to: those visited, and those a territory visited belongs to, as Greenland is Denmark's
-  const been = [...countriesOf(visitedList)]
-  const visitedCountries = been.length
+  const been = countriesOf(visitedList)
+  const visitedCountries = been.size
   const visitedTerritories = visitedList.filter((c) => !isCountry(c)).length
-  const visitedIn = (continent: Continent) => visitedList.filter((c) => c.properties.continent === continent)
+  /** Been to a place listed under a continent: a country (also in one of its territories), or a territory that is no country's */
+  const beenTo = (c: CountryFeature) => been.has(c) || visited.has(c.properties.name)
+  const isVisited = (c: CountryFeature) => visited.has(c.properties.name)
   /** Countries been to only in a territory of theirs, like Denmark in Greenland */
-  const throughTerritory = (country: CountryFeature) => !visited.has(country.properties.name)
-  const territoriesOf = (country: CountryFeature) =>
-    visitedList.filter((place) => place !== country && countryOfPlace(place) === country).map((place) => place.properties.name)
+  const throughTerritory = (country: CountryFeature) => !isVisited(country)
   const wishes = countries.filter((c) => wishlist.has(c.properties.name)).sort(byName)
-  // A second line under the name: "Territory", and states and cities visited; "In Greenland" for Denmark been to there
+  // A second line under the name: "Territory" for one that's no country's, and states and cities visited; "In Greenland" for Denmark been to there
   const noteFor = (c: CountryFeature) =>
     throughTerritory(c)
-      ? `In ${listOf(territoriesOf(c))}`
-      : [isCountry(c) ? null : 'Territory', note?.(c)].filter(Boolean).join(' · ') || null
+      ? `In ${listOf(territoriesOf(c).filter(isVisited).map((t) => t.properties.name))}`
+      : [countryOfPlace(c) ? null : 'Territory', note?.(c)].filter(Boolean).join(' · ') || null
 
   const add = (country: CountryFeature) => {
     onAdd(country.properties.name)
     setQuery('')
   }
-  // Every continent with countries, and Antarctica too once you've been to one of its territories
-  const continents = CONTINENTS.filter((continent) => COUNTRIES_IN.get(continent)! > 0 || visitedIn(continent).length > 0)
 
   return (
     <div className="visited">
@@ -106,12 +115,10 @@ export default function VisitedPanel(props: Props) {
 
       <h3>By continent</h3>
       <ul className="continent-stats" aria-label="Countries visited by continent">
-        {continents.map((continent) => {
+        {CONTINENTS.map((continent) => {
           const total = COUNTRIES_IN.get(continent)!
-          const countriesHere = been.filter((c) => c.properties.continent === continent)
-          // The places visited there, and the countries been to only in a territory elsewhere
-          const places = [...visitedIn(continent), ...countriesHere.filter(throughTerritory)].sort(byName)
-          const count = countriesHere.length
+          const places = PLACES_IN.get(continent)!.filter(beenTo)
+          const count = places.filter(isCountry).length
           return (
             <li key={continent}>
               {/* The whole bar opens the continent's places, over the rest; the button, for the keyboard */}
@@ -148,10 +155,11 @@ export default function VisitedPanel(props: Props) {
       {open && (
         <ContinentPopup
           continent={open}
-          visited={[...visitedIn(open), ...been.filter((c) => c.properties.continent === open).filter(throughTerritory)].sort(byName)}
-          notVisited={countries.filter((c) => isCountry(c) && c.properties.continent === open && !been.includes(c)).sort(byName)}
-          count={been.filter((c) => c.properties.continent === open).length}
+          visited={PLACES_IN.get(open)!.filter(beenTo)}
+          notVisited={PLACES_IN.get(open)!.filter((c) => !beenTo(c))}
+          count={PLACES_IN.get(open)!.filter((c) => isCountry(c) && beenTo(c)).length}
           total={COUNTRIES_IN.get(open)!}
+          isVisited={isVisited}
           noteFor={noteFor}
           canRemove={(c) => !throughTerritory(c) && !inTrips.has(c.properties.name)}
           onAdd={onAdd}
@@ -266,16 +274,18 @@ export default function VisitedPanel(props: Props) {
 
 type PopupProps = {
   continent: Continent
-  /** The places visited there, and countries been to only in a territory elsewhere */
+  /** Its countries been to, also only in a territory of theirs, and its territories visited that are no country's */
   visited: CountryFeature[]
-  /** Its countries not been to yet */
+  /** Its countries and those territories not been to yet */
   notVisited: CountryFeature[]
   /** Countries been to there, of how many */
   count: number
   total: number
+  /** Whether a territory listed under its country is visited */
+  isVisited: (place: CountryFeature) => boolean
   noteFor: (country: CountryFeature) => string | null
   canRemove: (country: CountryFeature) => boolean
-  /** Marks a country not been to yet as visited, which moves it up to those visited */
+  /** Marks a place not been to yet as visited; a country moves up to those visited, also when one of its territories is marked */
   onAdd: (name: string) => void
   onRemove: (name: string) => void
   onShow: (country: CountryFeature) => void
@@ -284,10 +294,12 @@ type PopupProps = {
 
 /**
  * A continent's places, over the rest: those visited first, then its
- * countries not been to yet, each to mark as visited. Closed with ×, Escape,
- * or a click beside it.
+ * countries not been to yet, each to mark as visited. A country's
+ * territories are under it, each visited or not. Closed with ×, Escape, or
+ * a click beside it.
  */
-function ContinentPopup({ continent, visited, notVisited, count, total, noteFor, canRemove, onAdd, onRemove, onShow, onClose }: PopupProps) {
+function ContinentPopup(props: PopupProps) {
+  const { continent, visited, notVisited, count, total, isVisited, noteFor, canRemove, onAdd, onRemove, onShow, onClose } = props
   const titleId = useId()
   // Escape closes it, before anything else
   useEffect(() => {
@@ -301,7 +313,7 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
   }, [onClose])
   /** A place: its flag and name; for one visited, what's noted about it and whether it can be removed, else a way to mark it */
   const row = (c: CountryFeature, been: boolean) => (
-    <li key={c.properties.name} className="country-item">
+    <>
       <button type="button" className="country-row" onClick={() => onShow(c)}>
         <Flag country={c} />
         <span className="row-text">
@@ -325,8 +337,26 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
           <CheckIcon size={15} />
         </button>
       )}
-    </li>
+    </>
   )
+  /** A place in the list, with the territories that belong to it under it */
+  const place = (c: CountryFeature, been: boolean) => {
+    const territories = territoriesOf(c)
+    return (
+      <li key={c.properties.name} className="continent-place">
+        <div className={been ? 'country-item' : 'country-item not-been'}>{row(c, been)}</div>
+        {territories.length > 0 && (
+          <ul className="country-list territories" aria-label={`Territories of ${c.properties.name}`}>
+            {territories.map((territory) => (
+              <li key={territory.properties.name} className={isVisited(territory) ? 'country-item' : 'country-item not-been'}>
+                {row(territory, isVisited(territory))}
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    )
+  }
   return createPortal(
     <div className="popup-backdrop" onClick={onClose}>
       <section className="card popup" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
@@ -351,7 +381,7 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
             <p className="muted continent-none">None yet in {continent}.</p>
           ) : (
             <ul className="country-list continent-places" aria-label={`Visited in ${continent}`}>
-              {visited.map((c) => row(c, true))}
+              {visited.map((c) => place(c, true))}
             </ul>
           )}
           {notVisited.length > 0 && (
@@ -359,8 +389,8 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
               <h3>
                 Not yet <span className="row-meta">{notVisited.length}</span>
               </h3>
-              <ul className="country-list continent-places not-yet" aria-label={`Not yet in ${continent}`}>
-                {notVisited.map((c) => row(c, false))}
+              <ul className="country-list continent-places" aria-label={`Not yet in ${continent}`}>
+                {notVisited.map((c) => place(c, false))}
               </ul>
             </>
           )}

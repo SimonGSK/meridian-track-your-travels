@@ -18,11 +18,15 @@ const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).next
 const results = () => screen.queryByRole('list', { name: 'Search results' })
 /** Opens a continent's places, over the rest */
 const toggle = (continent: string) => userEvent.click(screen.getByRole('button', { name: continent }))
-/** The places listed under a continent's bar */
-const listed = (continent: string) =>
-  within(screen.getByRole('list', { name: `Visited in ${continent}` }))
-    .getAllByRole('button', { name: /^(?!Remove)/ })
-    .map((b) => b.textContent)
+/** The places listed in a list, by name and note, without those under them */
+const placesIn = (list: HTMLElement) =>
+  [...list.children].map((li) => li.querySelector(':scope > .country-item .country-row, :scope > .country-row')!.textContent)
+/** The places visited in a continent's list */
+const listed = (continent: string) => placesIn(screen.getByRole('list', { name: `Visited in ${continent}` }))
+/** The places not been to yet in a continent's list */
+const notYet = (continent: string) => placesIn(screen.getByRole('list', { name: `Not yet in ${continent}` }))
+/** A country's territories, listed under it */
+const territoriesListed = (country: string) => placesIn(screen.getByRole('list', { name: `Territories of ${country}` }))
 
 describe('VisitedPanel', () => {
   it("shows how many of the world's countries have been visited", () => {
@@ -59,7 +63,8 @@ describe('VisitedPanel', () => {
   it("lists a country been to only in a territory under its continent, saying where, with nothing to remove", async () => {
     const { onShow } = setup(['Iceland', 'Greenland', 'Faroe Islands'])
     await toggle('Europe')
-    expect(listed('Europe')).toEqual(['DenmarkIn Faroe Islands and Greenland', 'Faroe IslandsTerritory', 'Iceland'])
+    expect(listed('Europe')).toEqual(['DenmarkIn Faroe Islands and Greenland', 'Iceland'])
+    expect(territoriesListed('Denmark')).toEqual(['Faroe Islands', 'Greenland'])
     expect(screen.queryByRole('button', { name: 'Remove Denmark' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove Faroe Islands' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /^Denmark/ }))
@@ -77,9 +82,8 @@ describe('VisitedPanel', () => {
     await toggle('Europe')
     expect(screen.getByRole('dialog', { name: 'Europe' })).toHaveTextContent('2 / 46')
     expect(listed('Europe')).toEqual(['Denmark', 'Sweden'])
-    const notYet = within(screen.getByRole('list', { name: 'Not yet in Europe' })).getAllByRole('listitem')
-    expect(notYet).toHaveLength(44)
-    expect(notYet.map((li) => li.textContent)).toContain('Norway')
+    expect(notYet('Europe')).toHaveLength(44)
+    expect(notYet('Europe')).toContain('Norway')
     expect(screen.getByRole('button', { name: 'Europe' })).toHaveAttribute('aria-expanded', 'true')
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -101,12 +105,12 @@ describe('VisitedPanel', () => {
     }
     render(<Atlas />)
     await toggle('Europe')
-    const notYet = screen.getByRole('list', { name: 'Not yet in Europe' })
-    expect(within(notYet).queryByRole('button', { name: 'Mark Denmark as visited' })).not.toBeInTheDocument()
-    await userEvent.click(within(notYet).getByRole('button', { name: 'Mark Norway as visited' }))
+    const notYetList = screen.getByRole('list', { name: 'Not yet in Europe' })
+    expect(within(notYetList).queryByRole('button', { name: 'Mark Denmark as visited' })).not.toBeInTheDocument()
+    await userEvent.click(within(notYetList).getByRole('button', { name: 'Mark Norway as visited' }))
     expect(screen.getByRole('dialog', { name: 'Europe' })).toHaveTextContent('2 / 46')
     expect(listed('Europe')).toEqual(['Denmark', 'Norway'])
-    expect(within(notYet).getAllByRole('listitem')).toHaveLength(44)
+    expect(notYet('Europe')).toHaveLength(44)
     expect(screen.queryByRole('button', { name: 'Mark Norway as visited' })).not.toBeInTheDocument()
   })
 
@@ -119,15 +123,19 @@ describe('VisitedPanel', () => {
     expect(screen.queryByRole('button', { name: 'Remove Sweden' })).not.toBeInTheDocument()
   })
 
-  it("shows Antarctica, which has no countries, once you've been to one of its territories", async () => {
-    const antarctic = countries.find((c) => c.properties.continent === 'Antarctica')!
+  it('shows Antarctica, which has no countries, with how many of its places have been visited', async () => {
     setup(['Denmark'])
-    expect(screen.queryByRole('button', { name: 'Antarctica' })).not.toBeInTheDocument()
-    cleanup()
-    setup([antarctic.properties.name])
-    expect(screen.getByRole('button', { name: 'Antarctica' }).closest('.continent-row')).toHaveTextContent('1 place')
+    const bar = () => screen.getByRole('button', { name: 'Antarctica' }).closest('.continent-row')
+    expect(bar()).toHaveTextContent('0 places')
     await toggle('Antarctica')
-    expect(listed('Antarctica')).toEqual([expect.stringContaining(antarctic.properties.name)])
+    expect(screen.getByText('None yet in Antarctica.')).toBeInTheDocument()
+    expect(notYet('Antarctica')).toEqual(['Antarctica'])
+    cleanup()
+    // The territories down there are under their countries: Heard Island under Australia
+    setup(['Antarctica', 'Heard Island and McDonald Islands'])
+    expect(bar()).toHaveTextContent('1 place')
+    await toggle('Antarctica')
+    expect(listed('Antarctica')).toEqual(['AntarcticaTerritory'])
   })
 
   it('adds the place found', async () => {
@@ -153,11 +161,40 @@ describe('VisitedPanel', () => {
     expect(screen.getByRole('button', { name: /^Denmark/ })).toHaveTextContent(/^Denmark$/)
   })
 
-  it('marks territories in the list', async () => {
-    setup(['Denmark', 'Greenland'])
+  it("lists a country's territories under it, with its continent, each visited or not", async () => {
+    const { onAdd, onRemove } = setup(['Denmark', 'Greenland'])
+    await toggle('Europe')
+    expect(listed('Europe')).toEqual(['Denmark'])
+    expect(territoriesListed('Denmark')).toEqual(['Faroe Islands', 'Greenland'])
+    const territories = screen.getByRole('list', { name: 'Territories of Denmark' })
+    await userEvent.click(within(territories).getByRole('button', { name: 'Mark Faroe Islands as visited' }))
+    expect(onAdd).toHaveBeenCalledWith('Faroe Islands')
+    await userEvent.click(within(territories).getByRole('button', { name: 'Remove Greenland' }))
+    expect(onRemove).toHaveBeenCalledWith('Greenland')
+    await userEvent.keyboard('{Escape}')
+    // Not on their own under the continent they're on
     await toggle('North America')
-    const northAmerica = screen.getByRole('list', { name: 'Visited in North America' })
-    expect(within(northAmerica).getByRole('button', { name: /^Greenland/ })).toHaveTextContent('Territory')
+    expect(screen.queryByRole('list', { name: 'Visited in North America' })).not.toBeInTheDocument()
+    expect(notYet('North America')).not.toContain('Greenland')
+  })
+
+  it("lists the territories of a country not been to yet under it, to mark as visited", async () => {
+    const { onAdd } = setup()
+    await toggle('North America')
+    expect(notYet('North America')).toContain('United States')
+    expect(notYet('North America')).not.toContain('Puerto Rico')
+    const territories = screen.getByRole('list', { name: 'Territories of United States' })
+    expect(placesIn(territories)).toEqual(['American Samoa', 'Guam', 'Northern Mariana Islands', 'Puerto Rico', 'U.S. Virgin Islands'])
+    await userEvent.click(within(territories).getByRole('button', { name: 'Mark Puerto Rico as visited' }))
+    expect(onAdd).toHaveBeenCalledWith('Puerto Rico')
+  })
+
+  it("lists a territory that is no country's on its own, under its continent", async () => {
+    setup(['Western Sahara'])
+    await toggle('Africa')
+    expect(listed('Africa')).toEqual(['Western SaharaTerritory'])
+    expect(notYet('Africa')).not.toContain('Western Sahara')
+    expect(notYet('Africa')).toContain('Morocco')
   })
 
   it('shows how much of each continent has been visited', () => {
@@ -170,11 +207,12 @@ describe('VisitedPanel', () => {
     expect(screen.getByRole('progressbar', { name: 'North America: 0 of 23 countries' })).toBeInTheDocument()
   })
 
-  it('shows every inhabited continent, even with nothing visited', () => {
+  it('shows every continent, even with nothing visited', () => {
     setup()
     const stats = screen.getByRole('list', { name: 'Countries visited by continent' })
     expect(within(stats).getAllByRole('listitem').map((li) => li.querySelector('.continent-name')!.textContent)).toEqual([
       'Africa',
+      'Antarctica',
       'Asia',
       'Europe',
       'North America',

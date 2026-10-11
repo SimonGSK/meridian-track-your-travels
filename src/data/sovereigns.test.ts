@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { countries } from '../countries'
-import { countryOfPlace } from './sovereigns'
+import { countryOfPlace, territoriesOf } from './sovereigns'
 
 const place = (name: string) => countries.find((c) => c.properties.name === name)!
 const countryOf = (name: string) => countryOfPlace(place(name))?.properties.name ?? null
@@ -32,5 +32,32 @@ describe('countryOfPlace', () => {
       const country = countryOfPlace(territory)
       if (country) expect(country.properties.kind, territory.properties.name).toBe('country')
     }
+  })
+})
+
+describe('territoriesOf', () => {
+  const territoriesOfPlace = (name: string) => territoriesOf(place(name)).map((t) => t.properties.name)
+
+  it("is a country's territories, by name", () => {
+    expect(territoriesOfPlace('Denmark')).toEqual(['Faroe Islands', 'Greenland'])
+    expect(territoriesOfPlace('United States')).toEqual([
+      'American Samoa',
+      'Guam',
+      'Northern Mariana Islands',
+      'Puerto Rico',
+      'U.S. Virgin Islands',
+    ])
+  })
+
+  it('is none for a country without territories, and for a territory', () => {
+    expect(territoriesOfPlace('Sweden')).toEqual([])
+    expect(territoriesOfPlace('Greenland')).toEqual([])
+  })
+
+  it('has every territory that belongs to a country under it, once', () => {
+    const listed = countries.flatMap((c) => territoriesOf(c))
+    const belonging = countries.filter((c) => c.properties.kind !== 'country' && countryOfPlace(c))
+    expect(listed).toHaveLength(belonging.length)
+    expect(new Set(listed)).toEqual(new Set(belonging))
   })
 })
