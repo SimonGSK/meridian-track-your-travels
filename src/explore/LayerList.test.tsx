@@ -3,11 +3,20 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import LayerList from './LayerList'
 import { DEFAULT_SETTINGS, type Settings } from './useSettings'
+import { CLASSIC, MIDNIGHT, type Theme } from '../globe/themes'
 
-function setup({ settings = DEFAULT_SETTINGS }: { settings?: Settings } = {}) {
+function setup({ settings = DEFAULT_SETTINGS, theme = MIDNIGHT }: { settings?: Settings; theme?: Theme } = {}) {
   const props = { settings, onChange: vi.fn() }
-  render(<LayerList {...props} />)
+  render(<LayerList {...props} theme={theme} />)
   return props
+}
+
+/** A layer's dot */
+const dotOf = (name: string) => screen.getByRole('switch', { name: new RegExp(`^${name}`) }).querySelector('.dot') as HTMLElement
+/** A color as the browser gives it back */
+const rgb = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 describe('LayerList', () => {
@@ -29,6 +38,43 @@ describe('LayerList', () => {
     expect(lights.closest('li')).toHaveClass('sublayer')
     await userEvent.click(lights)
     expect(onChange).toHaveBeenCalledWith({ showCityLights: false })
+  })
+
+  it('lists the layers by color, and by name within a color, a layer offered under another after it', () => {
+    setup({ settings: { ...DEFAULT_SETTINGS, showVisitHeat: true, showDayNight: true } })
+    expect(screen.getAllByRole('switch').map((s) => s.textContent)).toEqual([
+      'City pins',
+      'Visited countries',
+      'Heat map by visits',
+      'Visited states',
+      'Flights',
+      'Future trips',
+      'Wishlist',
+      'Day and night',
+      'City lights',
+      'Small islands',
+    ])
+  })
+
+  it("colors each layer's dot as it is on the globe in the design shown", () => {
+    setup()
+    expect(dotOf('City pins').style.background).toBe(rgb(MIDNIGHT.pin))
+    expect(dotOf('Visited countries').style.background).toBe(rgb(MIDNIGHT.visited))
+    expect(dotOf('Flights').style.background).toBe(rgb(MIDNIGHT.flight))
+    expect(dotOf('Wishlist').style.background).toBe(rgb(MIDNIGHT.wishlist))
+    expect(dotOf('Future trips').style.boxShadow).toContain(MIDNIGHT.flight)
+    cleanup()
+    setup({ theme: CLASSIC })
+    expect(dotOf('City pins').style.background).toBe(rgb(CLASSIC.pin))
+    expect(dotOf('Visited countries').style.background).toBe(rgb(CLASSIC.visited))
+  })
+
+  it('turns future trips on and off', async () => {
+    const { onChange } = setup()
+    const future = screen.getByRole('switch', { name: /Future trips/ })
+    expect(future).toBeChecked()
+    await userEvent.click(future)
+    expect(onChange).toHaveBeenCalledWith({ showFutureTrips: false })
   })
 
   it('turns layers on and off', async () => {

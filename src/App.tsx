@@ -652,8 +652,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     return undefined
   }, [compareShown, comparison, yearPicked, theme])
   const colorWishlist = yearShown || replay || compareShown || showsGame(game) || !settings.showWishlist ? NO_VISITS : wishlist
-  // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's)
-  const plansShown = !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
+  // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's), if switched on
+  const plansShown =
+    settings.showFutureTrips && !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
   // The places of trips to come you haven't been to yet
   const plannedNames = useMemo(
     () => new Set(visitsToCome.map((visit) => visit.place).filter((place) => !visited.has(place))),
@@ -825,10 +826,13 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         ],
       }
     }
-    if (showsGame(game) || compareOpen || (!yearShown && !settings.showFlights)) return NO_FLIGHTS
+    // The flights taken, and those booked, each if switched on (a year shows its flights all the same)
+    const flownShown = !!yearShown || settings.showFlights
+    const bookedShown = !lapseStep && !yearShown && settings.showFutureTrips
+    if (showsGame(game) || compareOpen || (!flownShown && !bookedShown)) return NO_FLIGHTS
     // In the time-lapse, the flights so far, that year's standing out
     const picked = lapseStep ? lapseStep.newFlights : (shownRoutes ?? [])
-    const flown = lapseStep ? lapseStep.flights : yearShown ? yearShown.flights : routes
+    const flown = flownShown ? (lapseStep ? lapseStep.flights : yearShown ? yearShown.flights : routes) : []
     const isPicked = (route: Route) => picked.some((p) => uniqueRoutes([route, p]).length === 1)
     const lines = uniqueRoutes(flown).map((route) => ({
       key: route.flight.id,
@@ -844,7 +848,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     // Flights booked, dashed, on the globe as it is: each route once (dashes there and back would fill each other's
     // gaps), and not over one flown already
     if (lapseStep || yearShown) return { lines, journeys }
-    const booked = uniqueRoutes(upcomingRoutes).filter((route) => !flown.some((f) => uniqueRoutes([f, route]).length === 1))
+    const booked = uniqueRoutes(bookedShown ? upcomingRoutes : []).filter(
+      (route) => !flown.some((f) => uniqueRoutes([f, route]).length === 1),
+    )
     return {
       lines: [
         ...lines,
@@ -868,6 +874,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     yearShown,
     compareOpen,
     settings.showFlights,
+    settings.showFutureTrips,
     game,
     shownRoutes,
     savedTrips,

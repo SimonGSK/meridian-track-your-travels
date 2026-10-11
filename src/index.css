@@ -436,10 +436,6 @@ input:focus-visible {
   background: var(--accent);
 }
 
-.dot.blue {
-  background: #5fb3ff;
-}
-
 .dot.wish {
   background: var(--wish);
 }

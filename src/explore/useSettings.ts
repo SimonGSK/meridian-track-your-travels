@@ -16,6 +16,8 @@ export type Settings = {
   showCities: boolean
   /** Lines for the flights you've taken */
   showFlights: boolean
+  /** The places and flights of trips to come, tinted and dashed */
+  showFutureTrips: boolean
   /** Night where the sun has set, as it is now */
   showDayNight: boolean
   /** The cities lit up at night, while day and night is shown */
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showRegions: true,
   showCities: true,
   showFlights: true,
+  showFutureTrips: true,
   showDayNight: false,
   showCityLights: true,
 }
