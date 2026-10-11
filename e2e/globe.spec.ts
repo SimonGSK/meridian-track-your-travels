@@ -189,7 +189,8 @@ test.describe('visited states', () => {
     await page.getByRole('searchbox', { name: 'Add a country' }).fill('Australia')
     await page.getByRole('button', { name: /^Australia/ }).first().click()
     await page.getByRole('button', { name: 'Oceania', exact: true }).click()
-    await page.getByRole('dialog').getByRole('button', { name: /^Australia/ }).click() // show it
+    // The first: Australia's territories are listed under it (Australian Indian Ocean Territories)
+    await page.getByRole('dialog').getByRole('button', { name: /^Australia/ }).first().click() // show it
     await expect(panel(page).getByRole('heading', { name: 'Australia' })).toBeVisible()
 
     const statesLine = panel(page).getByRole('button', { name: /explored$/ })
@@ -201,8 +202,8 @@ test.describe('visited states', () => {
     await page.reload()
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
     await page.getByRole('button', { name: 'Oceania', exact: true }).click()
-    await expect(page.getByRole('button', { name: /^Australia/ })).toContainText('1 of 9 states and territories')
-    await page.getByRole('button', { name: /^Australia/ }).click()
+    await expect(page.getByRole('button', { name: /^Australia/ }).first()).toContainText('1 of 9 states and territories')
+    await page.getByRole('button', { name: /^Australia/ }).first().click()
     await statesLine.click()
     await expect(panel(page).getByRole('checkbox', { name: 'Tasmania' })).toBeChecked()
   })

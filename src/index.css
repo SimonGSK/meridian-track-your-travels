@@ -1517,13 +1517,24 @@ code {
   margin-top: 4px;
 }
 
-/* Countries not been to yet, quieter than those visited */
-.continent-places.not-yet .row-name {
+/* Places not been to yet, quieter than those visited */
+.continent-places .not-been .row-name {
   color: var(--text-muted);
 }
 
-.continent-places.not-yet .mini-flag {
+.continent-places .not-been .mini-flag {
   opacity: 0.55;
+}
+
+/* A country's territories, under it, their flags in line with its name */
+.continent-places .territories {
+  margin: 0 0 4px 32px;
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+}
+
+.continent-places .territories .country-row {
+  padding-block: 6px;
 }
 
 .icon-button.mark-visited:hover {

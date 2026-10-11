@@ -63,6 +63,16 @@ export function countryOfPlace(place: CountryFeature): CountryFeature | null {
   return code ? countryByAlpha2(code) : null
 }
 
+/** Each country's territories, by name */
+const TERRITORIES = new Map<CountryFeature, CountryFeature[]>()
+for (const place of [...countries].sort((a, b) => a.properties.name.localeCompare(b.properties.name))) {
+  const country = countryOfPlace(place)
+  if (country && country !== place) TERRITORIES.set(country, [...(TERRITORIES.get(country) ?? []), place])
+}
+
+/** The territories that belong to a country, by name: Denmark's are the Faroe Islands and Greenland */
+export const territoriesOf = (country: CountryFeature): readonly CountryFeature[] => TERRITORIES.get(country) ?? []
+
 /** The countries places are in, each once: Greenland and the Faroe Islands are both Denmark */
 export function countriesOf(places: Iterable<CountryFeature>): Set<CountryFeature> {
   return new Set([...places].map(countryOfPlace).filter((country) => country !== null))
