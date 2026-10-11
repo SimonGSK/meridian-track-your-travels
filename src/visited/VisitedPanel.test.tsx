@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -89,6 +90,24 @@ describe('VisitedPanel', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await toggle('Africa')
     expect(screen.getByText('None yet in Africa.')).toBeInTheDocument()
+  })
+
+  it("marks a country not been to yet as visited from its continent's places, which moves it up, open still", async () => {
+    function Atlas() {
+      const [visited, setVisited] = useState(new Set(['Denmark']))
+      return (
+        <VisitedPanel visited={visited} onAdd={(name) => setVisited(new Set([...visited, name]))} onRemove={vi.fn()} onShow={vi.fn()} />
+      )
+    }
+    render(<Atlas />)
+    await toggle('Europe')
+    const notYet = screen.getByRole('list', { name: 'Not yet in Europe' })
+    expect(within(notYet).queryByRole('button', { name: 'Mark Denmark as visited' })).not.toBeInTheDocument()
+    await userEvent.click(within(notYet).getByRole('button', { name: 'Mark Norway as visited' }))
+    expect(screen.getByRole('dialog', { name: 'Europe' })).toHaveTextContent('2 / 46')
+    expect(listed('Europe')).toEqual(['Denmark', 'Norway'])
+    expect(within(notYet).getAllByRole('listitem')).toHaveLength(44)
+    expect(screen.queryByRole('button', { name: 'Mark Norway as visited' })).not.toBeInTheDocument()
   })
 
   it('has nothing to remove for a place a trip has been to', async () => {

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { countries, searchCountries, type CountryFeature } from '../countries'
 import { CONTINENTS, type Continent } from '../data/continents'
 import { flagUrl } from '../flags'
-import { CloseIcon, StarIcon } from '../icons'
+import { CheckIcon, CloseIcon, StarIcon } from '../icons'
 import { countriesOf, countryOfPlace } from '../data/sovereigns'
 import { percentLabel } from './percentLabel'
 import StatsBox from '../ui/StatsBox'
@@ -154,6 +154,7 @@ export default function VisitedPanel(props: Props) {
           total={COUNTRIES_IN.get(open)!}
           noteFor={noteFor}
           canRemove={(c) => !throughTerritory(c) && !inTrips.has(c.properties.name)}
+          onAdd={onAdd}
           onRemove={onRemove}
           onShow={(c) => {
             setOpen(null)
@@ -274,6 +275,8 @@ type PopupProps = {
   total: number
   noteFor: (country: CountryFeature) => string | null
   canRemove: (country: CountryFeature) => boolean
+  /** Marks a country not been to yet as visited, which moves it up to those visited */
+  onAdd: (name: string) => void
   onRemove: (name: string) => void
   onShow: (country: CountryFeature) => void
   onClose: () => void
@@ -281,9 +284,10 @@ type PopupProps = {
 
 /**
  * A continent's places, over the rest: those visited first, then its
- * countries not been to yet. Closed with ×, Escape, or a click beside it.
+ * countries not been to yet, each to mark as visited. Closed with ×, Escape,
+ * or a click beside it.
  */
-function ContinentPopup({ continent, visited, notVisited, count, total, noteFor, canRemove, onRemove, onShow, onClose }: PopupProps) {
+function ContinentPopup({ continent, visited, notVisited, count, total, noteFor, canRemove, onAdd, onRemove, onShow, onClose }: PopupProps) {
   const titleId = useId()
   // Escape closes it, before anything else
   useEffect(() => {
@@ -295,7 +299,7 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
     document.addEventListener('keydown', onKeyDown, true)
     return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [onClose])
-  /** A place: its flag and name, and for one visited, what's noted about it and whether it can be removed */
+  /** A place: its flag and name; for one visited, what's noted about it and whether it can be removed, else a way to mark it */
   const row = (c: CountryFeature, been: boolean) => (
     <li key={c.properties.name} className="country-item">
       <button type="button" className="country-row" onClick={() => onShow(c)}>
@@ -308,6 +312,17 @@ function ContinentPopup({ continent, visited, notVisited, count, total, noteFor,
       {been && canRemove(c) && (
         <button type="button" className="icon-button small" onClick={() => onRemove(c.properties.name)} aria-label={`Remove ${c.properties.name}`}>
           ×
+        </button>
+      )}
+      {!been && (
+        <button
+          type="button"
+          className="icon-button small mark-visited"
+          onClick={() => onAdd(c.properties.name)}
+          aria-label={`Mark ${c.properties.name} as visited`}
+          title="Mark as visited"
+        >
+          <CheckIcon size={15} />
         </button>
       )}
     </li>
