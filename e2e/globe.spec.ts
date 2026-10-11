@@ -621,11 +621,16 @@ test.describe('design', () => {
 
 test.describe('games', () => {
   const feedback = (page: Page) => page.getByRole('status')
+  /** Opens a game's setup from the Games list: its kind, then it (no title for the only game of its kind, opened with it) */
+  const openGame = async (page: Page, kind: string, title?: string) => {
+    await page.locator('#side-panel').getByRole('button', { name: new RegExp(`^${kind}`) }).click()
+    if (title) await page.locator('#side-panel').getByRole('button', { name: new RegExp(`^${title}`) }).click()
+  }
 
   test('find the country: clicking the globe answers the round', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Find the country/ }).click()
+    await openGame(page, 'Countries', 'Find the country')
     await page.getByRole('button', { name: /^Easy/ }).click()
     await expect(page.getByText('Round 1 of 10')).toBeVisible()
 
@@ -644,7 +649,7 @@ test.describe('games', () => {
   test('find the city: a click anywhere on the globe is scored by how far off it is', async ({ page }) => {
     const { errors } = await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Find the city/ }).click()
+    await openGame(page, 'Cities')
     await page.getByRole('button', { name: /^Medium/ }).click()
     await expect(page.getByText('Round 1 of 10')).toBeVisible()
 
@@ -660,7 +665,7 @@ test.describe('games', () => {
   test('neighbours: naming countries that border the one lit up', async ({ page }) => {
     const { errors } = await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Neighbours/ }).click()
+    await openGame(page, 'Countries', 'Neighbours')
     await page.getByRole('button', { name: /^Medium/ }).click()
     await expect(page.getByText('Country 1 of 5')).toBeVisible()
 
@@ -680,7 +685,7 @@ test.describe('games', () => {
   test('flag quiz: picking a country gives feedback', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Flag quiz/ }).click()
+    await openGame(page, 'Flags')
     await page.getByRole('button', { name: /^Easy/ }).click()
     const flag = page.getByRole('img', { name: 'The flag to identify' })
     await expect.poll(() => flag.evaluate((img) => (img as { naturalWidth: number }).naturalWidth)).toBeGreaterThan(0)
@@ -693,7 +698,7 @@ test.describe('games', () => {
   test('letter hunt: clicking the globe checks the letter', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Letter hunt/ }).click()
+    await openGame(page, 'Countries', 'Letter hunt')
     await page.getByRole('button', { name: /^K:/ }).click()
     await expect(page.getByText('Found 0 of 6')).toBeVisible()
 
@@ -710,7 +715,7 @@ test.describe('games', () => {
   test('shape quiz on medium: type an answer', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Shape quiz/ }).click()
+    await openGame(page, 'Countries', 'Shape quiz')
     await page.getByRole('button', { name: /^Medium/ }).click()
     await expect(page.getByRole('img', { name: 'The outline to identify' })).toBeVisible()
 
@@ -726,7 +731,7 @@ test.describe('games', () => {
   test('capital quiz: pick a capital on easy, type one on medium', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Capital quiz/ }).click()
+    await openGame(page, 'Capitals', 'Capital quiz')
     await page.getByRole('button', { name: /^Easy/ }).click()
     await expect(page.getByText("What's the capital of")).toBeVisible()
     await page.locator('.options .option').first().click()
@@ -735,8 +740,9 @@ test.describe('games', () => {
     await expect(page.getByText('Round 2 of 10')).toBeVisible()
 
     await page.getByRole('button', { name: 'Quit game' }).click()
-    await page.getByRole('button', { name: '← All games' }).click()
-    await page.getByRole('button', { name: /Capital quiz/ }).click()
+    // Back to the capitals games
+    await page.getByRole('button', { name: '← Capitals' }).click()
+    await page.getByRole('button', { name: /^Capital quiz/ }).click()
     await page.getByRole('button', { name: /^Medium/ }).click()
     const input = page.getByRole('textbox', { name: 'Your answer' })
     await expect(input).toBeFocused()
@@ -748,7 +754,7 @@ test.describe('games', () => {
   test('whose capital: pick the country from its capital', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Whose capital/ }).click()
+    await openGame(page, 'Capitals', 'Whose capital')
     await page.getByRole('button', { name: /^Easy/ }).click()
     await expect(page.getByText('Which country has this capital?')).toBeVisible()
     await page.locator('.options .option').first().click()
@@ -781,7 +787,7 @@ test.describe('games', () => {
   test('higher or lower: guess until the run ends', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Higher or lower/ }).click()
+    await openGame(page, 'Facts')
     await page.getByRole('button', { name: /^Population/ }).click()
     const over = page.getByText('in a row')
     // Always "more": right about half the time, so the run soon ends. The game's button, not the More tab's
@@ -792,14 +798,14 @@ test.describe('games', () => {
     }
     await expect(over).toBeVisible()
     await page.getByRole('button', { name: 'All games' }).click()
-    await page.getByRole('button', { name: /Higher or lower/ }).click()
+    await openGame(page, 'Facts')
     await expect(page.getByRole('button', { name: /^Population/ })).toContainText('in a row')
   })
 
   test('name them all: type countries until giving up', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Name them all/ }).click()
+    await openGame(page, 'Countries', 'Name them all')
     await page.getByRole('button', { name: /^Oceania/ }).click()
     const input = page.getByRole('textbox', { name: 'Name a country' })
     await expect(input).toBeFocused()
@@ -817,7 +823,7 @@ test.describe('games', () => {
   test('all countries: 197 rounds, which can be stopped early', async ({ page }) => {
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Flag quiz/ }).click()
+    await openGame(page, 'Flags')
     await page.getByRole('button', { name: /^All countries/ }).click()
     await expect(page.getByText('Round 1 of 197')).toBeVisible()
     const input = page.getByRole('textbox', { name: 'Your answer' })
@@ -832,7 +838,7 @@ test.describe('games', () => {
     test.slow() // ten rounds, each with a camera flight
     await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await page.getByRole('button', { name: /Name that country/ }).click()
+    await openGame(page, 'Countries', 'Name that country')
     await page.getByRole('button', { name: /^Easy/ }).click()
     for (let round = 1; round <= 10; round++) {
       await expect(page.getByText(`Round ${round} of 10`)).toBeVisible()
@@ -841,7 +847,7 @@ test.describe('games', () => {
     }
     await expect(page.getByText(/^\d+ \/ 10$/)).toBeVisible()
     await page.getByRole('button', { name: 'All games' }).click()
-    await page.getByRole('button', { name: /Name that country/ }).click()
+    await openGame(page, 'Countries', 'Name that country')
     await expect(page.getByRole('button', { name: /^Easy/ })).toContainText('Best:')
   })
 })

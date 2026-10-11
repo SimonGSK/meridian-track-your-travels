@@ -2198,13 +2198,20 @@ code {
   list-style: none;
 }
 
-/* The games of a kind under its name: "Countries", "Flags"… */
-.game-category h3 {
-  margin: 22px 0 0;
+/* A kind of games, opening its games: its name, and how many */
+.category-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.game-category .game-list {
-  margin-top: 8px;
+.category-title strong {
+  margin-right: auto;
+}
+
+.category-title svg {
+  flex: none;
+  color: var(--text-muted);
 }
 
 .game-card {

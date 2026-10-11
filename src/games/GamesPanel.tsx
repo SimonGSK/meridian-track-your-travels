@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { flagUrl } from '../flags'
 import type { CountryFeature } from '../countries'
 import CountryInput from './CountryInput'
@@ -21,11 +21,16 @@ import {
   answerMode,
   currentRound,
   difficultyDescription,
+  gamesOf,
+  listedUnder,
   maxScore,
   maxScoreFor,
   maxScorePlayed,
   kindOf,
   roundsPlayed,
+  isCategory,
+  type GameCategory,
+  type GameChoice,
   type QuizKind,
   type Difficulty,
   type GameId,
@@ -45,6 +50,7 @@ import {
   type Scope,
 } from './allGame'
 import { CONTINENTS } from '../data/continents'
+import { ChevronIcon } from '../icons'
 
 type Props = {
   game: GameState | null
@@ -74,9 +80,9 @@ type Props = {
   /** End a game played in rounds early */
   onStop: () => void
   onQuit: () => void
-  /** Whose setup is open, when the caller keeps track (so it stays open across tabs) */
-  chosen?: GameId | null
-  onChoose?: (id: GameId | null) => void
+  /** The kind of games listed, or whose setup is open, when the caller keeps track (so it stays open across tabs) */
+  chosen?: GameChoice | null
+  onChoose?: (choice: GameChoice | null) => void
 }
 
 const titleOf = (id: GameId) => GAMES.find((g) => g.id === id)!.title
@@ -85,12 +91,12 @@ const difficultyLabel = (d: Difficulty) => DIFFICULTIES.find((x) => x.id === d)!
 const formatScore = (id: RoundGameId, difficulty: Difficulty, score: number) =>
   `${score} / ${maxScoreFor(id, difficulty)}${id === 'find' ? ' points' : ''}`
 
-type Chosen = { chosen: GameId | null; setChosen: (id: GameId | null) => void }
+type Chosen = { chosen: GameChoice | null; setChosen: (choice: GameChoice | null) => void }
 
 export default function GamesPanel(props: Props) {
   const { game } = props
   // Which game's setup is open; kept while playing so "Another letter" can return to it
-  const [ownChoice, setOwnChoice] = useState<GameId | null>(null)
+  const [ownChoice, setOwnChoice] = useState<GameChoice | null>(null)
   const choice = {
     chosen: props.chosen !== undefined ? props.chosen : ownChoice,
     setChosen: props.onChoose ?? setOwnChoice,
@@ -113,21 +119,26 @@ function DailyStatus({ results, today }: { results: DailyResults; today: string 
   return <span className="best-score">{done ? `Today: ${done.score} / ${done.max}${streak}` : `Not played today${streak}`}</span>
 }
 
-/** All games; picking one asks for the difficulty, or for the letter hunt the letter. */
+/**
+ * The daily challenge, and the kinds of games; picking a kind lists its
+ * games (or opens the only one), and picking one asks for the difficulty, or
+ * for the letter hunt the letter. Back goes to where it was picked.
+ */
 function GameList(props: Props & Chosen) {
   const { best, bestTimes = {}, onStart, onStartLetter, onStartAll, onStartHigher, chosen, setChosen } = props
   const [today] = useState(() => dayKey(new Date()))
-  const back = () => setChosen(null)
-  if (chosen === 'daily') return <DailyChoice results={props.daily ?? {}} onPlay={() => props.onStartDaily?.()} onBack={back} />
+  if (chosen === 'daily') return <DailyChoice results={props.daily ?? {}} onPlay={() => props.onStartDaily?.()} onBack={() => setChosen(null)} />
+  // A game's setup goes back to its kind's list
+  const category = chosen && !isCategory(chosen) ? listedUnder(chosen) : null
+  const back = { onBack: () => setChosen(category), backTo: category ?? 'All games' }
   const bests = { best, bestTimes }
-  if (chosen === 'letter') return <LetterChoice {...bests} onStartLetter={onStartLetter} onBack={back} />
-  if (chosen === 'all') return <ScopeChoice {...bests} onStartAll={onStartAll} onBack={back} />
-  if (chosen === 'higher') return <MeasureChoice best={best} onStart={onStartHigher} onBack={back} />
-  if (chosen === 'city') return <CityLevelChoice {...bests} onStart={(level) => props.onStartCity?.(level)} onBack={back} />
+  if (chosen === 'letter') return <LetterChoice {...bests} onStartLetter={onStartLetter} {...back} />
+  if (chosen === 'all') return <ScopeChoice {...bests} onStartAll={onStartAll} {...back} />
+  if (chosen === 'higher') return <MeasureChoice best={best} onStart={onStartHigher} {...back} />
+  if (chosen === 'city') return <CityLevelChoice {...bests} onStart={(level) => props.onStartCity?.(level)} {...back} />
   if (chosen === 'neighbours') {
-    return <NeighboursLevelChoice {...bests} onStart={(level) => props.onStartNeighbours?.(level)} onBack={back} />
+    return <NeighboursLevelChoice {...bests} onStart={(level) => props.onStartNeighbours?.(level)} {...back} />
   }
-  if (chosen) return <DifficultyChoice id={chosen} {...bests} onStart={onStart} onBack={back} />
   const card = (g: (typeof GAMES)[number]) => (
     <li key={g.id}>
       <button type="button" className={`game-card${g.id === 'daily' ? ' daily' : ''}`} onClick={() => setChosen(g.id)}>
@@ -137,35 +148,73 @@ function GameList(props: Props & Chosen) {
       </button>
     </li>
   )
+  if (chosen && isCategory(chosen)) return <CategoryGames category={chosen} card={card} onBack={() => setChosen(null)} />
+  if (chosen) return <DifficultyChoice id={chosen} {...bests} onStart={onStart} {...back} />
   return (
     <>
-      <p className="muted">Test your geography. Pick a game, then how hard you want it.</p>
-      <ul className="game-list">{GAMES.filter((g) => !g.category).map(card)}</ul>
-      {/* The others by what they ask about */}
-      {GAME_CATEGORIES.map((category) => (
-        <section key={category} className="game-category">
-          <h3>{category}</h3>
-          <ul className="game-list" aria-label={category}>
-            {GAMES.filter((g) => g.category === category).map(card)}
-          </ul>
-        </section>
-      ))}
+      <p className="muted">Test your geography. Pick a kind of game, then a game and how hard you want it.</p>
+      <ul className="game-list">
+        {GAMES.filter((g) => !g.category).map(card)}
+        {/* The others by what they ask about, each kind opening its games, or the only one */}
+        {GAME_CATEGORIES.map((kind) => {
+          const games = gamesOf(kind)
+          return (
+            <li key={kind}>
+              <button
+                type="button"
+                className="game-card category-card"
+                onClick={() => setChosen(games.length === 1 ? games[0].id : kind)}
+              >
+                <span className="category-title">
+                  <strong>{kind}</strong>
+                  {games.length > 1 && <span className="row-meta">{games.length} games</span>}
+                  <ChevronIcon />
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
     </>
   )
 }
 
-function DifficultyChoice({ id, best, bestTimes, onStart, onBack }: {
+/** The games of a kind: "Countries", "Flags"… */
+function CategoryGames({
+  category,
+  card,
+  onBack,
+}: {
+  category: GameCategory
+  card: (game: (typeof GAMES)[number]) => ReactNode
+  onBack: () => void
+}) {
+  return (
+    <div className="game">
+      <button type="button" className="text-button" onClick={onBack}>
+        ← All games
+      </button>
+      <h3 className="game-heading">{category}</h3>
+      <ul className="game-list" aria-label={category}>
+        {gamesOf(category).map(card)}
+      </ul>
+    </div>
+  )
+}
+
+function DifficultyChoice({ id, best, bestTimes, onStart, onBack, backTo }: {
   id: RoundGameId
   best: BestScores
   bestTimes: BestScores
   onStart: Props['onStart']
   onBack: () => void
+  backTo: string
 }) {
   const game = GAMES.find((g) => g.id === id)!
   return (
     <div className="game">
       <button type="button" className="text-button" onClick={onBack}>
-        ← All games
+        ← {backTo}
       </button>
       <h3 className="game-heading">{game.title}</h3>
       <p className="muted">
@@ -539,16 +588,17 @@ function ScoredResults(props: Props & Chosen & { game: RoundGameState | LetterGa
 }
 
 /** Every letter, grouped by difficulty, with the best score for each. */
-function LetterChoice({ best, bestTimes, onStartLetter, onBack }: {
+function LetterChoice({ best, bestTimes, onStartLetter, onBack, backTo }: {
   best: BestScores
   bestTimes: BestScores
   onStartLetter: (letter: string) => void
   onBack: () => void
+  backTo: string
 }) {
   return (
     <div className="game">
       <button type="button" className="text-button" onClick={onBack}>
-        ← All games
+        ← {backTo}
       </button>
       <h3 className="game-heading">{titleOf('letter')}</h3>
       <p className="muted">
@@ -594,16 +644,17 @@ function LetterChoice({ best, bestTimes, onStartLetter, onBack }: {
 }
 
 /** Choose the whole world or a continent for "name them all", with the best for each. */
-function ScopeChoice({ best, bestTimes, onStartAll, onBack }: {
+function ScopeChoice({ best, bestTimes, onStartAll, onBack, backTo }: {
   best: BestScores
   bestTimes: BestScores
   onStartAll: (scope: Scope) => void
   onBack: () => void
+  backTo: string
 }) {
   return (
     <div className="game">
       <button type="button" className="text-button" onClick={onBack}>
-        ← All games
+        ← {backTo}
       </button>
       <h3 className="game-heading">{titleOf('all')}</h3>
       <p className="muted">

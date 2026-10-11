@@ -30,6 +30,7 @@ import {
 import { INITIAL_VIEW, SCREENSAVER_VIEW } from './globe/interaction'
 import { SCREENSAVER_PIN_FADE } from './globe/pinLayer'
 import { UPDATE_READY } from './pwa/update'
+import { openGame } from './test/openGame'
 
 // WebGL doesn't exist in jsdom, so the globe is replaced by a stand-in that
 // exposes what the app passes to it. Screen positions map to places by x.
@@ -1121,7 +1122,7 @@ describe('App', () => {
       expect(painted()).toEqual({ Japan: DEFAULT_THEME.visited, Peru: DEFAULT_THEME.wishlist })
 
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Flag quiz/ }))
+      await openGame('Flag quiz')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(painted()).toEqual({})
     })
@@ -1251,7 +1252,7 @@ describe('App', () => {
       await openUnitedStates()
       click(800)
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Flag quiz/ }))
+      await openGame('Flag quiz')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(shownRegions()).toEqual({})
     })
@@ -1366,7 +1367,7 @@ describe('App', () => {
       expect(pinned()).toEqual(['Aarhus'])
 
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Flag quiz/ }))
+      await openGame('Flag quiz')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(pinned()).toEqual([])
     })
@@ -1606,7 +1607,7 @@ describe('App', () => {
       expect(drawn()).toEqual(['CPH-BKK'])
 
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Flag quiz/ }))
+      await openGame('Flag quiz')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(drawn()).toEqual([])
     })
@@ -1850,7 +1851,7 @@ describe('App', () => {
       render(<App />)
       expect(night()).toBe(true)
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Find the country/ }))
+      await openGame('Find the country')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(night()).toBe(false)
       await userEvent.click(screen.getByRole('button', { name: 'Quit game' }))
@@ -1913,10 +1914,10 @@ describe('App', () => {
 
   describe('games', () => {
     const byName = (name: string) => countries.find((c) => c.properties.name === name)!
-    const startGame = async (title: RegExp, difficulty = 'Easy') => {
+    const startGame = async (title: string, difficulty = 'Easy') => {
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: title }))
+      await openGame(title)
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${difficulty}`) }))
     }
     const findTarget = () => screen.getByText('Find this country on the globe').nextElementSibling!.textContent!
@@ -1924,7 +1925,7 @@ describe('App', () => {
     const lastFlight = () => globe.pointOfView.mock.calls.filter((call) => call.length === 2).at(-1)
 
     it('hides names and flags while playing', async () => {
-      await startGame(/Find the country/)
+      await startGame('Find the country')
       hover(100)
       await act(() => new Promise((r) => setTimeout(r, 50)))
       expect(tooltip()).not.toBeInTheDocument()
@@ -1936,7 +1937,7 @@ describe('App', () => {
       click(100)
       await userEvent.click(within(countryPanel()!).getByRole('button', { name: 'Add to visited atlas' }))
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Flag quiz/ }))
+      await openGame('Flag quiz')
       await userEvent.click(screen.getByRole('button', { name: /^Easy/ }))
       expect(painted()).toEqual({})
     })
@@ -1944,7 +1945,7 @@ describe('App', () => {
     describe('neighbours', () => {
       it('lights up the country, then the neighbours named, and those missed once shown', async () => {
         const { borderingCountries } = await import('./games/neighboursGame')
-        await startGame(/Neighbours/)
+        await startGame('Neighbours')
         const name = screen.getByText('Name every country bordering').nextElementSibling!.textContent!
         const [first, ...rest] = borderingCountries(byName(name))
         expect(painted()).toEqual({ [name]: DEFAULT_THEME.selected })
@@ -1967,7 +1968,7 @@ describe('App', () => {
     describe('find the city', () => {
       const cityTarget = () => screen.getByText('Click where this city is on the globe').nextElementSibling!.textContent!
       const start = async () => {
-        await startGame(/Find the city/, 'Medium')
+        await startGame('Find the city', 'Medium')
         await screen.findByText('Click where this city is on the globe')
       }
       type Line = { from: { lat: number; lng: number }; to: { name: string }; highlighted: boolean }
@@ -2031,7 +2032,7 @@ describe('App', () => {
 
     describe('find the country', () => {
       it('scores 3 points for the right country on the first try', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         const target = findTarget()
         click(PLACE_OF[target])
         expect(feedback()).toHaveTextContent('Correct! +3 points')
@@ -2041,7 +2042,7 @@ describe('App', () => {
       })
 
       it('lets you try again after a miss, for fewer points', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         const target = findTarget()
         const wrong = Object.keys(PLACE_OF).find((name) => name !== target)!
         click(PLACE_OF[wrong])
@@ -2053,7 +2054,7 @@ describe('App', () => {
       })
 
       it('does not count a territory clicked, nor light it up', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         // A country lights up; moving on to a territory turns it off, and lights nothing
         hover(100)
         await waitFor(() => expect(painted()).toEqual({ Denmark: DEFAULT_THEME.hover }))
@@ -2067,7 +2068,7 @@ describe('App', () => {
       })
 
       it("shows the answer after \"I don't know\", with no points", async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         const target = findTarget()
         await userEvent.click(screen.getByRole('button', { name: "I don't know" }))
         expect(feedback()).toHaveTextContent(`The answer is ${target}.`)
@@ -2076,7 +2077,7 @@ describe('App', () => {
       })
 
       it('shows the answer and flies there after three misses', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         const target = findTarget()
         const wrong = Object.keys(PLACE_OF).filter((name) => name !== target).slice(0, 3)
         for (const name of wrong) click(PLACE_OF[name])
@@ -2087,7 +2088,7 @@ describe('App', () => {
       })
 
       it('ignores clicks on the ocean and after answering', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         click(300)
         expect(feedback()).toBeEmptyDOMElement()
         const target = findTarget()
@@ -2097,21 +2098,21 @@ describe('App', () => {
       })
 
       it('plays to the end and saves the best score', async () => {
-        await startGame(/Find the country/)
+        await startGame('Find the country')
         for (let round = 0; round < 5; round++) {
           click(PLACE_OF[findTarget()])
           await userEvent.click(screen.getByRole('button', { name: round < 4 ? 'Next' : 'See results' }))
         }
         expect(screen.getByText('15 / 15')).toBeInTheDocument()
         await userEvent.click(screen.getByRole('button', { name: 'All games' }))
-        await userEvent.click(screen.getByRole('button', { name: /Find the country/ }))
+        await openGame('Find the country')
         expect(screen.getByRole('button', { name: /^Easy/ })).toHaveTextContent('Best: 15 / 30 points')
       })
     })
 
     describe('flag quiz', () => {
       it('checks the chosen country against the flag', async () => {
-        await startGame(/Flag quiz/)
+        await startGame('Flag quiz')
         const src = screen.getByRole('img', { name: 'The flag to identify' }).getAttribute('src')!
         const code = src.match(/\/(\w\w)\.svg/)![1].toUpperCase()
         const target = countries.find((c) => c.properties.isoAlpha2 === code)!.properties.name
@@ -2121,7 +2122,7 @@ describe('App', () => {
       })
 
       it('does not open the country panel when clicking the globe', async () => {
-        await startGame(/Flag quiz/)
+        await startGame('Flag quiz')
         click(100)
         expect(countryPanel()).not.toBeInTheDocument()
         expect(feedback()).toBeEmptyDOMElement()
@@ -2130,7 +2131,7 @@ describe('App', () => {
 
     describe('name that country', () => {
       it('highlights the country in question and flies there, zoomed to fit', async () => {
-        await startGame(/Name that country/)
+        await startGame('Name that country')
         const highlighted = Object.entries(painted())
         expect(highlighted).toHaveLength(1)
         const [name, color] = highlighted[0]
@@ -2146,7 +2147,7 @@ describe('App', () => {
 
     describe('difficulty', () => {
       it('asks for typed answers on medium', async () => {
-        await startGame(/Shape quiz/, 'Medium')
+        await startGame('Shape quiz', 'Medium')
         const target = lastRoundGame.current!.rounds[0].target.properties.name
         await userEvent.type(screen.getByRole('textbox', { name: 'Your answer' }), `${target}{Enter}`)
         expect(feedback()).toHaveTextContent('Correct!')
@@ -2156,7 +2157,7 @@ describe('App', () => {
       })
 
       it('plays again at the same difficulty', async () => {
-        await startGame(/Shape quiz/, 'Medium')
+        await startGame('Shape quiz', 'Medium')
         for (const [i, round] of lastRoundGame.current!.rounds.entries()) {
           await userEvent.type(screen.getByRole('textbox', { name: 'Your answer' }), `${round.target.properties.name}{Enter}`)
           await userEvent.click(screen.getByRole('button', { name: i < 4 ? 'Next' : 'See results' }))
@@ -2168,7 +2169,7 @@ describe('App', () => {
     })
 
     it('capital quiz: lights up the country, flies there, and takes its capital', async () => {
-      await startGame(/Capital quiz/)
+      await startGame('Capital quiz')
       const target = screen.getByText("What's the capital of").nextElementSibling!.textContent!
       expect(painted()).toEqual({ [target]: DEFAULT_THEME.selected })
       expect(lastFlight()![0]).toMatchObject({ lat: expect.any(Number) })
@@ -2181,7 +2182,7 @@ describe('App', () => {
     it('higher or lower: lights up both countries, and ends at the first wrong guess with the streak', async () => {
       render(<App />)
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Higher or lower/ }))
+      await openGame('Higher or lower')
       await userEvent.click(screen.getByRole('button', { name: /^Area/ }))
       const pair = () => [...document.querySelectorAll('.higher-country dt')].map((dt) => dt.textContent!)
       const more = () => {
@@ -2199,7 +2200,7 @@ describe('App', () => {
       expect(screen.getByText('in a row')).toBeInTheDocument()
 
       await userEvent.click(screen.getByRole('button', { name: 'All games' }))
-      await userEvent.click(screen.getByRole('button', { name: /Higher or lower/ }))
+      await openGame('Higher or lower')
       expect(screen.getByRole('button', { name: /^Area/ })).toHaveTextContent('Best: 1 in a row')
     })
 
@@ -2223,7 +2224,7 @@ describe('App', () => {
     })
 
     it('rings no territories in the other games, as they are no part of them', async () => {
-      await startGame(/Find the country/)
+      await startGame('Find the country')
       expect(layer.setRings).toHaveBeenLastCalledWith(TINY_COUNTRIES, null)
       await userEvent.click(screen.getByRole('button', { name: 'Quit game' }))
       expect(layer.setRings).toHaveBeenLastCalledWith(tinyPlaces, null)
@@ -2233,7 +2234,7 @@ describe('App', () => {
       const startLetter = async (letter: string) => {
         render(<App />)
         await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-        await userEvent.click(screen.getByRole('button', { name: /Letter hunt/ }))
+        await openGame('Letter hunt')
         await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${letter}:`) }))
       }
 
@@ -2279,7 +2280,7 @@ describe('App', () => {
       it('lights up each country named, and shows the rest when giving up', async () => {
         render(<App />)
         await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-        await userEvent.click(screen.getByRole('button', { name: /Name them all/ }))
+        await openGame('Name them all')
         await userEvent.click(screen.getByRole('button', { name: /^Europe/ }))
         const input = screen.getByRole('textbox', { name: 'Name a country' })
         await userEvent.type(input, 'Denmark{Enter}')
@@ -2304,11 +2305,12 @@ describe('App', () => {
     })
 
     it('ends the game when the panel is closed', async () => {
-      await startGame(/Name that country/)
+      await startGame('Name that country')
       await userEvent.click(screen.getByRole('button', { name: 'Close panel' }))
       expect(painted()).toEqual({})
       await userEvent.click(screen.getByRole('button', { name: 'Games' }))
-      expect(screen.getByRole('button', { name: /Name that country/ })).toBeInTheDocument()
+      // Back at the start: the kinds of games
+      expect(screen.getByRole('button', { name: /^Countries/ })).toBeInTheDocument()
     })
   })
 })

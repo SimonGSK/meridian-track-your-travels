@@ -9,7 +9,7 @@ import type { CountryVisit } from './visited/CountryVisits'
 import ExplorePanel from './explore/ExplorePanel'
 import { useSettings } from './explore/useSettings'
 import GamesPanel from './games/GamesPanel'
-import { GAMES, type Difficulty, type GameId, type RoundGameId } from './games/games'
+import { GAMES, type Difficulty, type GameChoice, type RoundGameId } from './games/games'
 import type { Scope } from './games/allGame'
 import {
   LETTER_HUNT_RINGS,
@@ -166,8 +166,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // Big screens start with Explore open; phones with just the globe
   // Always a tab open: Explore, its buttons in a corner, when no other is
   const [view, setView] = useState<ViewId>(compareOnOpen ? 'more' : 'explore')
-  /** The game whose setup is open in the Games tab */
-  const [chosenGame, setChosenGame] = useState<GameId | null>(null)
+  /** The kind of games listed in the Games tab, or the game whose setup is open */
+  const [chosenGame, setChosenGame] = useState<GameChoice | null>(null)
   /** What's opened in the More tab, kept while the screensaver is previewed from it */
   const [moreOpen, setMoreOpen] = useState<MoreId | null>(compareOnOpen ? 'compare' : null)
   // Places marked visited, by hand

@@ -45,11 +45,22 @@ function Header({ game }: { game: HigherLowerState }) {
 }
 
 /** People or area, each with its longest streak */
-export function MeasureChoice({ best, onStart, onBack }: { best: BestScores; onStart: (measure: Measure) => void; onBack: () => void }) {
+export function MeasureChoice({
+  best,
+  onStart,
+  onBack,
+  backTo = 'All games',
+}: {
+  best: BestScores
+  onStart: (measure: Measure) => void
+  onBack: () => void
+  /** Where back goes: the kind of games it's listed under */
+  backTo?: string
+}) {
   return (
     <div className="game">
       <button type="button" className="text-button" onClick={onBack}>
-        ← All games
+        ← {backTo}
       </button>
       <h3 className="game-heading">Higher or lower</h3>
       <p className="muted">
