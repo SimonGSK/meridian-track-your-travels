@@ -35,14 +35,16 @@ type ChoiceProps = {
   bestTimes: BestScores
   onStart: (level: NeighboursLevel) => void
   onBack: () => void
+  /** Where back goes: the kind of games it's listed under */
+  backTo?: string
 }
 
 /** Easy, medium or hard, each with its best share of neighbours named */
-export function NeighboursLevelChoice({ best, bestTimes, onStart, onBack }: ChoiceProps) {
+export function NeighboursLevelChoice({ best, bestTimes, onStart, onBack, backTo = 'All games' }: ChoiceProps) {
   return (
     <div className="game">
       <button type="button" className="text-button" onClick={onBack}>
-        ← All games
+        ← {backTo}
       </button>
       <h3 className="game-heading">Neighbours</h3>
       <p className="muted">

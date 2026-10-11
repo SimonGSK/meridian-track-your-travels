@@ -72,6 +72,23 @@ export const GAMES: { id: GameId; title: string; description: string; category: 
   },
 ]
 
+/** What's open in the Games tab: a kind of games, listed, or a game's setup */
+export type GameChoice = GameId | GameCategory
+
+export const isCategory = (choice: GameChoice): choice is GameCategory => (GAME_CATEGORIES as readonly string[]).includes(choice)
+
+/** The games of a kind */
+export const gamesOf = (category: GameCategory) => GAMES.filter((g) => g.category === category)
+
+/**
+ * The kind whose list a game is in, or null for one picked straight from all
+ * games: the daily challenge, and the only game of its kind
+ */
+export function listedUnder(id: GameId) {
+  const { category } = GAMES.find((g) => g.id === id)!
+  return category && gamesOf(category).length > 1 ? category : null
+}
+
 export const DIFFICULTIES: { id: Difficulty; label: string; countries: string }[] = [
   { id: 'easy', label: 'Easy', countries: 'Big countries' },
   { id: 'medium', label: 'Medium', countries: 'All but the smallest countries' },
