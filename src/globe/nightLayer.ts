@@ -22,8 +22,8 @@ export const NIGHT_DARKNESS = 0.62
 export const PICTURE_DARKNESS = 0.8
 /** How bright the picture's lights are */
 const PICTURE_GAIN = 2.5
-const NIGHT_COLOR = '#02060d'
-const LIGHT_COLOR = '#ffd27f'
+export const NIGHT_COLOR = '#02060d'
+export const LIGHT_COLOR = '#ffd27f'
 
 /**
  * How dark it is where the sun is at `sine` (the sine of its height above

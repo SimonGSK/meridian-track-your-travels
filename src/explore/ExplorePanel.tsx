@@ -77,7 +77,7 @@ export default function ExplorePanel({ settings, onChange, theme, onThemeChange,
         <Card label="Style" className="layers-card">
           <DesignPanel theme={theme} onChange={onThemeChange} />
           <h3>Layers</h3>
-          <LayerList settings={settings} onChange={onChange} />
+          <LayerList settings={settings} theme={theme} onChange={onChange} />
         </Card>
       )}
     </section>

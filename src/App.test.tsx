@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
 import type { GlobeProps } from 'react-globe.gl'
@@ -1040,6 +1040,28 @@ describe('App', () => {
       const [booked] = document.querySelectorAll<HTMLElement>('.trip-header')
       expect(booked).toHaveTextContent(/^Mar \d{4} · in \d+ months$/)
       expect(within(booked).getByRole('img', { name: 'Japan' })).toBeInTheDocument()
+    })
+    it('leaves trips to come off the globe while switched off, and the flights taken while those are', async () => {
+      const nextYear = new Date().getFullYear() + 1
+      localStorage.setItem(
+        'countries-app.flights',
+        JSON.stringify([
+          { id: 'a', from: 'CPH', to: 'BKK' },
+          { id: 'b', from: 'CPH', to: 'NRT', date: `${nextYear}-03` },
+        ]),
+      )
+      withTrips({ items: [['Denmark', `${nextYear}-03`]] })
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showFutureTrips: false }))
+      render(<App />)
+      const lines = () => ((flightLayer.show.mock.calls.at(-1)?.[0] ?? []) as { key: string }[]).map((line) => line.key)
+      await waitFor(() => expect(lines()).toEqual(['a']))
+      expect(painted()).toEqual({})
+      expect(outlined()).toEqual([])
+      cleanup()
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showFlights: false }))
+      render(<App />)
+      await waitFor(() => expect(lines()).toEqual(['upcoming-b']))
+      expect(outlined()).toEqual(['Denmark'])
     })
   })
 
