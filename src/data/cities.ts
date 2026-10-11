@@ -22,6 +22,12 @@ export type City = {
    * outside its state's simplified outline
    */
   region?: string
+  /**
+   * How far it reaches from its point, in km: the radius of a circle as big
+   * as its built-up land, from Natural Earth's urban areas, by
+   * scripts/measure-cities.mjs; none for a city not in built-up land
+   */
+  radiusKm?: number
 }
 
 /** The cities, loaded on demand like the region shapes */

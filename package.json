@@ -18,6 +18,7 @@
     "data:regions": "node scripts/extract-regions.mjs",
     "data:facts": "node scripts/fetch-country-facts.mjs",
     "data:cities": "node scripts/extract-cities.mjs",
+    "data:city-sizes": "node scripts/measure-cities.mjs",
     "data:map": "node scripts/extract-map.mjs",
     "data:airports": "node scripts/fetch-airports.mjs",
     "data:icons": "node scripts/make-icons.mjs",

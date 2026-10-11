@@ -7,7 +7,8 @@ import { ROUNDS, shuffle } from './games'
 /**
  * Find the city: a city is named, with its country, and you click where it
  * is on the globe, land or sea. The closer, the more points: all of them
- * within SPOT_ON_KM, fewer the farther off.
+ * within SPOT_ON_KM, or anywhere in a big city that reaches farther, fewer
+ * the farther off.
  */
 
 export type CityLevel = 'easy' | 'medium' | 'hard'
@@ -24,9 +25,12 @@ export const SPOT_ON_KM = 20
 /** How fast the points fall off: about a third are left this far beyond spot on */
 const FALL_OFF_KM = 800
 
-/** 100 points within 20 km; 90 at 100 km, 55 at 500, 29 at 1,000, 8 at 2,000 */
-export const pointsForDistance = (km: number) =>
-  km <= SPOT_ON_KM ? MAX_CITY_POINTS : Math.round(MAX_CITY_POINTS * Math.exp(-(km - SPOT_ON_KM) / FALL_OFF_KM))
+/** How far from a city's point a click is spot on: within SPOT_ON_KM, or anywhere in a city that reaches farther */
+export const spotOnKm = (city: City) => Math.max(SPOT_ON_KM, city.radiusKm ?? 0)
+
+/** 100 points within 20 km (or as far as is spot on); 90 at 100 km, 55 at 500, 29 at 1,000, 8 at 2,000, beyond that */
+export const pointsForDistance = (km: number, spotOn = SPOT_ON_KM) =>
+  km <= spotOn ? MAX_CITY_POINTS : Math.round(MAX_CITY_POINTS * Math.exp(-(km - spotOn) / FALL_OFF_KM))
 
 /** Countries at least this big (km²) have their capitals in the easy level */
 const EASY_MIN_KM2 = 100_000
@@ -106,8 +110,9 @@ const isLast = (game: CityGameState) => game.index === game.rounds.length - 1
 /** Clicked somewhere on the globe: how far off, and the points for it. Once a round. */
 export function guessCity(game: CityGameState, position: LatLng, now = Date.now()): CityGameState {
   if (game.guess || game.finished) return game
-  const km = distanceKm(position, currentCity(game).city)
-  const points = pointsForDistance(km)
+  const { city } = currentCity(game)
+  const km = distanceKm(position, city)
+  const points = pointsForDistance(km, spotOnKm(city))
   return {
     ...game,
     guess: { position, km, points },

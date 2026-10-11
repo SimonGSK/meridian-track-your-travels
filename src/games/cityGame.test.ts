@@ -11,6 +11,7 @@ import {
   nextCity,
   pointsForDistance,
   skipCity,
+  spotOnKm,
   type CityGameState,
 } from './cityGame'
 
@@ -32,6 +33,25 @@ describe('pointsForDistance', () => {
     expect(pointsForDistance(1000)).toBe(29)
     expect(pointsForDistance(2000)).toBe(8)
     expect(pointsForDistance(10_000)).toBe(0)
+  })
+
+  it('gives every point as far as a big city reaches, and fewer from there', () => {
+    expect(pointsForDistance(60, 65)).toBe(100)
+    expect(pointsForDistance(65, 65)).toBe(100)
+    expect(pointsForDistance(145, 65)).toBe(pointsForDistance(100))
+  })
+})
+
+describe('spotOnKm', () => {
+  it('is 20 km, or as far as a big city reaches, by its built-up land', () => {
+    const named = (name: string) => cities.find((c) => c.name === name)!
+    expect(spotOnKm(named('Tokyo'))).toBeGreaterThan(50)
+    expect(spotOnKm(named('New York City'))).toBeGreaterThan(40)
+    expect(spotOnKm(named('Paris'))).toBeGreaterThan(25)
+    // Next to Tokyo, Yokohama doesn't reach into it
+    expect(spotOnKm(named('Yokohama'))).toBe(20)
+    expect(spotOnKm(named('Reykjavík'))).toBe(20)
+    expect(spotOnKm(named('Vatican City'))).toBe(20)
   })
 })
 
@@ -79,6 +99,14 @@ describe('a game', () => {
     expect(near.score).toBe(100)
     expect(near.scores).toEqual([100])
     expect(guessCity(near, { lat: 0, lng: 0 })).toBe(near)
+  })
+
+  it('counts a click anywhere in a big city as spot on', () => {
+    const tokyo = cityPool('medium', cities).find((round) => round.city.name === 'Tokyo')!
+    const game: CityGameState = { ...newCityGame('medium', cities, first), rounds: [tokyo] }
+    const west = guessCity(game, { lat: tokyo.city.lat, lng: tokyo.city.lng - 0.45 }) // about 40 km west
+    expect(west.guess!.km).toBeGreaterThan(35)
+    expect(west.guess!.points).toBe(100)
   })
 
   it("gives no points for I don't know", () => {

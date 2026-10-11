@@ -6,6 +6,7 @@ import {
   currentCity,
   formatKm,
   maxCityScore,
+  spotOnKm,
   type CityGameState,
   type CityLevel,
 } from './cityGame'
@@ -48,7 +49,7 @@ export function CityLevelChoice({ best, bestTimes, onStart, onBack, backTo = 'Al
       <h3 className="game-heading">Find the city</h3>
       <p className="muted">
         We name a city and its country; you click where it is on the globe. {MAX_CITY_POINTS} points within{' '}
-        {SPOT_ON_KM} km, fewer the farther off. Zoom in to be precise.
+        {SPOT_ON_KM} km, or anywhere in a big city, fewer the farther off. Zoom in to be precise.
       </p>
       <p className="game-prompt">Choose a difficulty</p>
       <ul className="game-list">
@@ -74,7 +75,7 @@ export function CityLevelChoice({ best, bestTimes, onStart, onBack, backTo = 'Al
   )
 }
 
-/** "Spot on! 8 km away. +100 points", or how far off */
+/** "Spot on! 8 km away. +100 points", "In Tokyo! 41 km from its center", or how far off */
 function feedback(game: CityGameState) {
   const { guess } = game
   if (!guess) return ''
@@ -82,6 +83,7 @@ function feedback(game: CityGameState) {
   if (guess.km === null) return `${city.name} is marked on the globe, in ${country.properties.name}.`
   const points = `+${guess.points} ${guess.points === 1 ? 'point' : 'points'}`
   if (guess.km <= SPOT_ON_KM) return `Spot on! ${formatKm(guess.km)} away. ${points}`
+  if (guess.km <= spotOnKm(city)) return `In ${city.name}! ${formatKm(guess.km)} from its center. ${points}`
   return `Off by ${formatKm(guess.km)}. ${points}`
 }
 
