@@ -16,8 +16,10 @@ export type Settings = {
   showCities: boolean
   /** Lines for the flights you've taken */
   showFlights: boolean
-  /** The places and flights of trips to come, tinted and dashed */
-  showFutureTrips: boolean
+  /** The flights booked for trips to come, dashed */
+  showFutureFlights: boolean
+  /** The places of trips to come, tinted and outlined in dashes */
+  showFutureVisits: boolean
   /** Night where the sun has set, as it is now */
   showDayNight: boolean
   /** The cities lit up at night, while day and night is shown */
@@ -33,7 +35,8 @@ export const DEFAULT_SETTINGS: Settings = {
   showRegions: true,
   showCities: true,
   showFlights: true,
-  showFutureTrips: true,
+  showFutureFlights: true,
+  showFutureVisits: true,
   showDayNight: false,
   showCityLights: true,
 }
@@ -41,9 +44,14 @@ export const DEFAULT_SETTINGS: Settings = {
 export const isSettings = (value: unknown): value is Partial<Settings> =>
   typeof value === 'object' && value !== null && Object.values(value).every((v) => typeof v === 'boolean')
 
+/** Future trips, switched as one before their flights and visits were apart */
+type Renamed = { showFutureTrips?: boolean }
+const renamed = ({ showFutureTrips, ...saved }: Partial<Settings> & Renamed): Partial<Settings> =>
+  showFutureTrips === undefined ? saved : { showFutureFlights: showFutureTrips, showFutureVisits: showFutureTrips, ...saved }
+
 /** Only the settings there are now: older versions saved some that are gone (which Explore cards to show) */
 const known = (saved: Partial<Settings>) =>
-  Object.fromEntries(Object.entries(saved).filter(([key]) => key in DEFAULT_SETTINGS)) as Partial<Settings>
+  Object.fromEntries(Object.entries(renamed(saved)).filter(([key]) => key in DEFAULT_SETTINGS)) as Partial<Settings>
 
 /** Map settings, saved in this browser. */
 export function useSettings() {

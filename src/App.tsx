@@ -654,7 +654,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const colorWishlist = yearShown || replay || compareShown || showsGame(game) || !settings.showWishlist ? NO_VISITS : wishlist
   // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's), if switched on
   const plansShown =
-    settings.showFutureTrips && !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
+    settings.showFutureVisits && !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
   // The places of trips to come you haven't been to yet
   const plannedNames = useMemo(
     () => new Set(visitsToCome.map((visit) => visit.place).filter((place) => !visited.has(place))),
@@ -828,7 +828,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     // The flights taken, and those booked, each if switched on (a year shows its flights all the same)
     const flownShown = !!yearShown || settings.showFlights
-    const bookedShown = !lapseStep && !yearShown && settings.showFutureTrips
+    const bookedShown = !lapseStep && !yearShown && settings.showFutureFlights
     if (showsGame(game) || compareOpen || (!flownShown && !bookedShown)) return NO_FLIGHTS
     // In the time-lapse, the flights so far, that year's standing out
     const picked = lapseStep ? lapseStep.newFlights : (shownRoutes ?? [])
@@ -874,7 +874,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     yearShown,
     compareOpen,
     settings.showFlights,
-    settings.showFutureTrips,
+    settings.showFutureFlights,
     game,
     shownRoutes,
     savedTrips,

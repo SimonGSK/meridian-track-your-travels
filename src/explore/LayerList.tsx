@@ -46,9 +46,16 @@ const LAYERS: Layer[] = [
   },
   { key: 'showFlights', label: 'Flights', description: "A line for each flight you've taken", dot: (theme) => ({ background: theme.flight }) },
   {
-    key: 'showFutureTrips',
-    label: 'Future trips',
-    description: 'The places and flights of trips to come, tinted and dashed',
+    key: 'showFutureFlights',
+    label: 'Future flights',
+    description: 'The flights booked for trips to come, dashed',
+    // A ring, lighter than a flight taken, as dashes are
+    dot: (theme) => ({ background: 'none', boxShadow: `inset 0 0 0 1.5px ${theme.flight}` }),
+  },
+  {
+    key: 'showFutureVisits',
+    label: 'Future visits',
+    description: 'The places of trips to come, tinted and outlined in dashes',
     // Tinted, and outlined as they are
     dot: (theme) => ({ background: plannedColor(theme, land(theme)), boxShadow: `inset 0 0 0 1.5px ${theme.flight}` }),
   },

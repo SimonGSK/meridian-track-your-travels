@@ -48,7 +48,8 @@ describe('LayerList', () => {
       'Heat map by visits',
       'Visited states',
       'Flights',
-      'Future trips',
+      'Future flights',
+      'Future visits',
       'Wishlist',
       'Day and night',
       'City lights',
@@ -62,19 +63,24 @@ describe('LayerList', () => {
     expect(dotOf('Visited countries').style.background).toBe(rgb(MIDNIGHT.visited))
     expect(dotOf('Flights').style.background).toBe(rgb(MIDNIGHT.flight))
     expect(dotOf('Wishlist').style.background).toBe(rgb(MIDNIGHT.wishlist))
-    expect(dotOf('Future trips').style.boxShadow).toContain(MIDNIGHT.flight)
+    expect(dotOf('Future flights').style.boxShadow).toContain(MIDNIGHT.flight)
+    expect(dotOf('Future visits').style.boxShadow).toContain(MIDNIGHT.flight)
     cleanup()
     setup({ theme: CLASSIC })
     expect(dotOf('City pins').style.background).toBe(rgb(CLASSIC.pin))
     expect(dotOf('Visited countries').style.background).toBe(rgb(CLASSIC.visited))
   })
 
-  it('turns future trips on and off', async () => {
-    const { onChange } = setup()
-    const future = screen.getByRole('switch', { name: /Future trips/ })
-    expect(future).toBeChecked()
-    await userEvent.click(future)
-    expect(onChange).toHaveBeenCalledWith({ showFutureTrips: false })
+  it("turns trips to come's flights and visits on and off, each on its own", async () => {
+    const { onChange } = setup({ settings: { ...DEFAULT_SETTINGS, showFutureVisits: false } })
+    const flights = screen.getByRole('switch', { name: /Future flights/ })
+    expect(flights).toBeChecked()
+    await userEvent.click(flights)
+    expect(onChange).toHaveBeenCalledWith({ showFutureFlights: false })
+    const visits = screen.getByRole('switch', { name: /Future visits/ })
+    expect(visits).not.toBeChecked()
+    await userEvent.click(visits)
+    expect(onChange).toHaveBeenCalledWith({ showFutureVisits: true })
   })
 
   it('turns layers on and off', async () => {
