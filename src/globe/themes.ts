@@ -1,7 +1,6 @@
 import { Color } from 'three'
 import earthImage from '../assets/earth-blue-marble.jpg'
 import earthWater from '../assets/earth-water.png'
-import earthLights from '../assets/earth-lights.jpg'
 import earthRelief from '../assets/earth-topology.png'
 
 /** A visual design for the globe. */
@@ -31,11 +30,11 @@ export type Theme = {
   /**
    * A picture of the Earth on the globe, instead of colored land on a colored
    * sea: only places colored (visited, picked…) are painted over it, letting
-   * `tint` of their color through. `water` marks the sea, to shine; `relief`
-   * is how high the land is, for mountains to catch the light; and `night` is
-   * the Earth's lights at night, on black, for the side the sun has set on.
+   * `tint` of their color through. `water` marks the sea, to shine; and
+   * `relief` is how high the land is, for mountains to catch the light. Its
+   * night is dark as from space, under the Earth's lights.
    */
-  imagery?: { map: string; water?: string; relief?: string; night?: string; tint: number }
+  imagery?: { map: string; water?: string; relief?: string; tint: number }
 }
 
 export const MIDNIGHT: Theme = {
@@ -182,7 +181,7 @@ export const REALISTIC: Theme = {
   wrong: '#ff5c5c',
   background: '#02060d',
   atmosphere: '#6fb3ff',
-  imagery: { map: earthImage, water: earthWater, relief: earthRelief, night: earthLights, tint: 0.45 },
+  imagery: { map: earthImage, water: earthWater, relief: earthRelief, tint: 0.45 },
 }
 
 export const THEMES: readonly Theme[] = [MIDNIGHT, CLASSIC, VINTAGE, POLITICAL, NIGHT, MINIMAL, REALISTIC]

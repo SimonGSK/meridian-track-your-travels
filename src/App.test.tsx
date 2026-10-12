@@ -14,6 +14,7 @@ import { SUN_UPDATE_MS } from './globe/hooks'
 import { SETTINGS_KEY } from './explore/useSettings'
 import { countryOfCity, loadCities, type City } from './data/cities'
 import { distanceKm } from './data/flights'
+import { NIGHT_DARKNESS, PICTURE_DARKNESS } from './globe/nightLayer'
 import { spotOnKm } from './games/cityGame'
 import { loadAirports } from './data/airports'
 import { loadRegions } from './data/regions'
@@ -36,7 +37,7 @@ import { openGame } from './test/openGame'
 
 // WebGL doesn't exist in jsdom, so the globe is replaced by a stand-in that
 // exposes what the app passes to it. Screen positions map to places by x.
-const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightLayer, planLayer, areaLayer, sceneObjects } = vi.hoisted(() => {
+const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightLayer, nightLights, planLayer, areaLayer, sceneObjects } = vi.hoisted(() => {
   const listeners = new Map<string, Set<() => void>>()
   const sceneObjects = new Set<object>()
   const controls = {
@@ -86,7 +87,9 @@ const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightL
     regionLayer: { object: {}, show: vi.fn(), setOutlineColor: vi.fn(), setFillOpacity: vi.fn(), dispose: vi.fn() },
     pinLayer: { object: {}, show: vi.fn(), setColor: vi.fn(), setFade: vi.fn(), dispose: vi.fn() },
     flightLayer: { object: {}, show: vi.fn(), setColors: vi.fn(), tick: vi.fn(), dispose: vi.fn() },
-    nightLayer: { object: { night: true }, setSun: vi.fn(), setLights: vi.fn(), setPicture: vi.fn(), dispose: vi.fn() },
+    nightLayer: { object: { night: true }, setSun: vi.fn(), setLights: vi.fn(), setPicture: vi.fn(), setDarkness: vi.fn(), dispose: vi.fn() },
+    // NASA's picture of the Earth's lights at night, as if loaded (or as if it couldn't be)
+    nightLights: { picture: { name: 'earth-lights' } as unknown, failed: false },
     planLayer: { object: {}, show: vi.fn(), setColor: vi.fn(), dispose: vi.fn() },
     // The same kind of layer, outlining how far a city reaches in "find the city"
     areaLayer: { object: {}, show: vi.fn(), setColor: vi.fn(), dispose: vi.fn() },
@@ -108,6 +111,9 @@ vi.mock('./globe/picking', () => ({
     PLACES[x] ?? (x >= 2000 && x < 2400 ? { lat: 12.3, lng: -64 + (x - 2000) * 0.02 } : null),
 }))
 vi.mock('./globe/regionLayer', () => ({ createRegionLayer: () => regionLayer }))
+vi.mock('./globe/nightLights', () => ({
+  useNightLights: (wanted: boolean) => (wanted ? nightLights : { picture: null, failed: false }),
+}))
 vi.mock('./globe/planLayer', () => ({
   createPlanLayer: (_: number, name?: string) => (name === 'city-area' ? areaLayer : planLayer),
 }))
@@ -1858,7 +1864,7 @@ describe('App', () => {
       expect(night()).toBe(false)
     })
 
-    it('puts night where the sun has set, lights the cities, and moves on every minute', async () => {
+    it("puts night where the sun has set, lit by the Earth's lights from space, and moves on every minute", async () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showDayNight: true }))
       vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'], now: new Date('2026-06-21T12:00:00Z') })
       try {
@@ -1870,7 +1876,10 @@ describe('App', () => {
         const [sun] = nightLayer.setSun.mock.lastCall!
         expect(sun).toEqual(subsolarPoint(new Date('2026-06-21T12:00:00Z')))
         expect(sun.lat).toBeCloseTo(23.4, 0)
-        expect(nightLayer.setLights.mock.lastCall![0].length).toBeGreaterThan(1000)
+        // NASA's picture in every design, not a dot for each city, the night as dark as the design has it
+        expect(nightLayer.setPicture).toHaveBeenLastCalledWith(nightLights.picture)
+        expect(nightLayer.setLights).toHaveBeenLastCalledWith([])
+        expect(nightLayer.setDarkness).toHaveBeenLastCalledWith(NIGHT_DARKNESS)
         act(() => vi.advanceTimersByTime(SUN_UPDATE_MS))
         expect(nightLayer.setSun.mock.lastCall![0].lng).toBeCloseTo(sun.lng - 0.25, 1) // a quarter degree west
       } finally {
@@ -1881,11 +1890,33 @@ describe('App', () => {
     it('can show night without the city lights', async () => {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showDayNight: true }))
       render(<App />)
-      await waitFor(() => expect(nightLayer.setLights.mock.lastCall![0].length).toBeGreaterThan(1000))
+      expect(nightLayer.setPicture).toHaveBeenLastCalledWith(nightLights.picture)
       await openLayers()
       await userEvent.click(screen.getByRole('switch', { name: /City lights/ }))
       expect(night()).toBe(true)
+      expect(nightLayer.setPicture).toHaveBeenLastCalledWith(null)
       expect(nightLayer.setLights).toHaveBeenLastCalledWith([])
+    })
+
+    it("is as dark as from space in the Realistic design, under the same lights", async () => {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showDayNight: true }))
+      localStorage.setItem('countries-app.design', JSON.stringify('realistic'))
+      render(<App />)
+      expect(nightLayer.setPicture).toHaveBeenLastCalledWith(nightLights.picture)
+      expect(nightLayer.setDarkness).toHaveBeenLastCalledWith(PICTURE_DARKNESS)
+    })
+
+    it("lights each city as a dot instead, should the picture not load", async () => {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showDayNight: true }))
+      const loaded = { ...nightLights }
+      Object.assign(nightLights, { picture: null, failed: true })
+      try {
+        render(<App />)
+        await waitFor(() => expect(nightLayer.setLights.mock.lastCall![0].length).toBeGreaterThan(1000))
+        expect(nightLayer.setPicture).toHaveBeenLastCalledWith(null)
+      } finally {
+        Object.assign(nightLights, loaded)
+      }
     })
 
     it('is hidden during games, where it would hide what to find', async () => {

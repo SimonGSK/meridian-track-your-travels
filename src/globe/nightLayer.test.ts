@@ -44,7 +44,7 @@ describe('createNightLayer', () => {
     expect(lightSize(30_000_000)).toBe(5)
   })
 
-  it('shows a picture of the Earth at night instead, darker, its lights over the dark', () => {
+  it("lights the night with a picture of the Earth's lights instead, over the dark, as dark as it's told", () => {
     const layer = createNightLayer(100)
     const [shell] = layer.object.children as Mesh<SphereGeometry, ShaderMaterial>[]
     expect(shell.material.premultipliedAlpha).toBe(true)
@@ -52,10 +52,11 @@ describe('createNightLayer', () => {
     layer.setPicture(picture)
     expect(shell.material.uniforms.picture.value).toBe(picture)
     expect(shell.material.uniforms.hasPicture.value).toBe(1)
+    expect(shell.material.uniforms.darkness.value).toBe(NIGHT_DARKNESS)
+    layer.setDarkness(PICTURE_DARKNESS)
     expect(shell.material.uniforms.darkness.value).toBe(PICTURE_DARKNESS)
     layer.setPicture(null)
     expect(shell.material.uniforms.hasPicture.value).toBe(0)
-    expect(shell.material.uniforms.darkness.value).toBe(NIGHT_DARKNESS)
     layer.dispose()
   })
 

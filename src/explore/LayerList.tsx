@@ -73,7 +73,7 @@ const LAYERS: Layer[] = [
   {
     key: 'showCityLights',
     label: 'City lights',
-    description: 'Cities lit up on the night side',
+    description: "The Earth's lights at night, as seen from space",
     dot: () => ({ background: LIGHT_COLOR }),
     under: 'showDayNight',
   },
