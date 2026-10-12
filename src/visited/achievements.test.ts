@@ -9,6 +9,7 @@ const atlas = (changes: Partial<Atlas> = {}): Atlas => ({
   cities: [],
   flights: [],
   visitsTo: () => 0,
+  trips: [],
   ...changes,
 })
 const achievement = (id: string) => ACHIEVEMENTS.find((a) => a.id === id)!
@@ -70,6 +71,41 @@ describe('achievements', () => {
     const visitsTo = (name: string) => (name === 'Spain' ? 4 : 1)
     expect(progress('visits-3', { visited: new Set(['Spain', 'Italy']), visitsTo }).done).toBe(true)
     expect(progress('visits-5', { visited: new Set(['Spain']), visitsTo }).have).toBe(4)
+  })
+
+  describe('of trips', () => {
+    const CPH = { lat: 55.6, lng: 12.6 }
+    const NRT = { lat: 35.8, lng: 140.4 }
+    const LAX = { lat: 33.9, lng: -118.4 }
+    const trip = (places: string[], ...stops: { lat: number; lng: number }[]) => ({
+      places,
+      flights: stops.slice(1).map((to, i) => ({ from: stops[i], to })),
+    })
+
+    it('count the trips been on', () => {
+      expect(progress('trips-10', { trips: [trip(['Japan']), trip(['Peru'])] })).toEqual({ have: 2, need: 10, done: false })
+    })
+
+    it('count the countries of the trip that went to the most, a territory as its country', () => {
+      const nordic = trip(['Denmark', 'Greenland', 'Iceland', 'Norway', 'Sweden'])
+      expect(progress('trip-countries-5', { trips: [nordic] }).have).toBe(4) // Greenland is Denmark
+      expect(progress('trip-countries-5', { trips: [nordic, trip(['France', 'Spain', 'Portugal', 'Italy', 'Germany'])] }).done).toBe(true)
+    })
+
+    it('count the continents a trip has gone to, each on any trip', () => {
+      const trips = [trip(['Denmark', 'Japan']), trip(['Peru']), trip(['Kenya', 'Mexico'])]
+      expect(progress('trip-every-continent', { trips })).toEqual({ have: 5, need: 6, done: false })
+      expect(progress('trip-every-continent', { trips: [...trips, trip(['Fiji'])] }).done).toBe(true)
+    })
+
+    it('count how far round the Earth one trip went: there and back is nowhere, east all the way round is 360°', () => {
+      expect(progress('round-the-world', { trips: [trip(['Japan'], CPH, NRT, CPH)] }).have).toBe(0)
+      expect(progress('round-the-world', { trips: [trip(['Japan'], CPH, NRT)] }).have).toBe(128)
+      expect(progress('round-the-world', { trips: [trip(['Japan', 'United States'], CPH, NRT, LAX, CPH)] }).done).toBe(true)
+      // West too
+      expect(progress('round-the-world', { trips: [trip(['United States', 'Japan'], CPH, LAX, NRT, CPH)] }).done).toBe(true)
+      expect(achievement('round-the-world').format!(214)).toBe('214°')
+    })
   })
 
   it('never count past what they need', () => {

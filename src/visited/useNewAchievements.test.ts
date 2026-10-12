@@ -9,6 +9,7 @@ const atlas = (visited: string[], cities: { capital?: boolean }[] = []): Atlas =
   cities,
   flights: [],
   visitsTo: () => 0,
+  trips: [],
 })
 
 function setup(first: Atlas, loaded = true) {

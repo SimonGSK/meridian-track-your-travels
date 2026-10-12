@@ -9,6 +9,7 @@ const atlas = (changes: Partial<Atlas> = {}): Atlas => ({
   cities: [],
   flights: [],
   visitsTo: () => 0,
+  trips: [],
   ...changes,
 })
 const group = (name: string) => screen.getByRole('region', { name: new RegExp(`^${name}`) })
