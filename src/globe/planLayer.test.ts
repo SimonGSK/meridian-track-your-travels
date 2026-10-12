@@ -24,6 +24,15 @@ describe('createPlanLayer', () => {
     layer.dispose()
   })
 
+  it('outlines any area, under a name of its own', () => {
+    const layer = createPlanLayer(RADIUS, 'city-area')
+    expect(layer.object.name).toBe('city-area')
+    const square: GeoJSON.Polygon = { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] }
+    layer.show([{ geometry: square }])
+    expect(layer.object.children).toHaveLength(1)
+    layer.dispose()
+  })
+
   it('takes its color', () => {
     const layer = createPlanLayer(RADIUS)
     layer.setColor('#ff0000')

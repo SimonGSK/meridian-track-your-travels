@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { geoCircle } from 'd3-geo'
 import Globe, { type GlobeMethods } from 'react-globe.gl'
 import { MeshPhongMaterial } from 'three'
 import { countries, tinyPlaces, type CountryFeature } from './countries'
@@ -22,7 +23,7 @@ import {
   showsGame,
 } from './games/globeView'
 import { useGame } from './games/useGame'
-import { currentCity, type CityLevel } from './games/cityGame'
+import { currentCity, spotOnKm, type CityLevel } from './games/cityGame'
 import { currentNeighbours, type NeighboursLevel } from './games/neighboursGame'
 import type { Measure } from './games/higherLower'
 import { useTheme } from './design/useTheme'
@@ -72,7 +73,7 @@ import YearsPanel from './visited/YearsPanel'
 import WrappedView from './visited/WrappedView'
 import { reviewOf, spotsOf, spotsOfStep, timelineOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { useTimeLapse } from './visited/useTimeLapse'
-import { distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
+import { EARTH_KM, distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
 import {
   journeysOf,
   looseOf,
@@ -125,6 +126,13 @@ const RENDERER_CONFIG = { antialias: true, alpha: true, powerPreference: 'high-p
 
 const NO_VISITS: ReadonlySet<string> = new Set()
 const NO_DATES: readonly VisitDate[] = []
+
+/** A circle `km` around a place, as an area to outline */
+const areaAround = ({ lat, lng }: { lat: number; lng: number }, km: number) => ({
+  geometry: geoCircle()
+    .center([lng, lat])
+    .radius((km / EARTH_KM) * (180 / Math.PI))() as GeoJSON.Polygon,
+})
 
 /** What to keep in view to see places, by name, each as wide as it is */
 const spotsOfPlaces = (names: readonly string[]): Spot[] =>
@@ -772,6 +780,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       : []
   }, [cityAnswer, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
   usePinLayer(globe, pinned, cityAnswer ? theme.correct : theme.pin, screensaver || previewing ? SCREENSAVER_PIN_FADE : PIN_FADE)
+  // And how far it reaches: anywhere in there is spot on
+  const cityArea = useMemo(() => (cityAnswer ? [areaAround(cityAnswer.city, spotOnKm(cityAnswer.city))] : []), [cityAnswer])
+  usePlanLayer(globe, cityArea, theme.correct, 'city-area')
   // Night as it is now, lit by the cities; not in games, where it would hide what to find
   // With a picture of the Earth's lights at night, the cities are lit in it, rather than as dots
   const nightPicture = settings.showCityLights ? (imagery?.night ?? null) : null

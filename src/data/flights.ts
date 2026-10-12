@@ -9,7 +9,8 @@ export type Flight = { id: string; from: string; to: string; date?: VisitDate }
 /** As saved: the first flights went between cities (GeoNames ids), before there were airports */
 export type StoredFlight = { id: string; from: string | number; to: string | number; date?: VisitDate }
 
-const EARTH_KM = 6371
+/** The Earth's mean radius */
+export const EARTH_KM = 6371
 /** Once around the Earth at the equator */
 export const EARTH_CIRCUMFERENCE_KM = 40_075
 

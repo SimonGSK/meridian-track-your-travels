@@ -11,7 +11,7 @@ import { PIN_FADE, createPinLayer, type Pin, type PinLayer } from './pinLayer'
 import { createFlightLayer, type FlightJourney, type FlightLayer, type FlightLine } from './flightLayer'
 import { loadAirports, type Airport } from '../data/airports'
 import { createRegionLayer, type RegionLayer } from './regionLayer'
-import { createPlanLayer, type PlanLayer } from './planLayer'
+import { createPlanLayer, type Outlined, type PlanLayer } from './planLayer'
 import { createNightLayer, type Light } from './nightLayer'
 import { subsolarPoint } from './sun'
 import { approach, isClick, type LatLng, type Point } from './interaction'
@@ -443,14 +443,14 @@ export function useFlightLayer(
   }, [globe, lines, journeys])
 }
 
-/** Places you're going to, outlined in dashes of `color` */
-export function usePlanLayer(globe: GlobeMethods | null, places: readonly CountryFeature[], color: string) {
+/** Places you're going to, outlined in dashes of `color`; or other areas, in a layer of another `name` */
+export function usePlanLayer(globe: GlobeMethods | null, places: readonly Outlined[], color: string, name?: string) {
   const layer = useRef<PlanLayer | null>(null)
 
   useEffect(() => {
     if (!globe) return
     const scene = globe.scene()
-    const created = createPlanLayer(globe.getGlobeRadius())
+    const created = createPlanLayer(globe.getGlobeRadius(), name)
     scene.add(created.object)
     layer.current = created
     return () => {
@@ -458,7 +458,7 @@ export function usePlanLayer(globe: GlobeMethods | null, places: readonly Countr
       created.dispose()
       layer.current = null
     }
-  }, [globe])
+  }, [globe, name])
 
   useEffect(() => {
     layer.current?.setColor(color)
