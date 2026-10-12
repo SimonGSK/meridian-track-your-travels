@@ -8,6 +8,7 @@ import type { GameState } from './useGame'
 import { giveUpAll, nameCountry, newAllGame } from './allGame'
 import { guess, newHigherLower, type HigherLowerState } from './higherLower'
 import { dayKey, newDailyGame, shiftDay } from './daily'
+import { newBiggerCity, pickBigger, type BiggerCityState } from './biggerCity'
 import { capitalOf } from '../data/capitals'
 import { countries } from '../countries'
 import { openGame } from '../test/openGame'
@@ -76,7 +77,7 @@ describe('GamesPanel: choosing a game', () => {
       'Name them all',
     ])
     expect(await titles('Capitals')).toEqual(['Capital quiz', 'Whose capital?'])
-    expect(await titles('Cities')).toEqual(['Find the city', 'Whose city?'])
+    expect(await titles('Cities')).toEqual(['Find the city', 'Whose city?', 'Bigger city'])
     // A kind with one game opens it, and goes back to all games
     for (const [kind, game] of [
       ['Flags', 'Flag quiz'],
@@ -530,6 +531,54 @@ describe('GamesPanel: whose city?', () => {
     await openGame('Whose city?')
     expect(screen.getByRole('button', { name: /^Easy/ })).toHaveTextContent('The biggest city of big countries, but not the capital')
     expect(screen.queryByRole('button', { name: /^All countries/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('GamesPanel: bigger city', () => {
+  const town = (id: number, name: string, place: string, population: number) => ({ id, name, place, lat: 0, lng: 0, population })
+  const TOKYO = town(1, 'Tokyo', 'JP', 8_336_599)
+  const OSAKA = town(2, 'Osaka', 'JP', 2_592_413)
+  const LYON = town(3, 'Lyon', 'FR', 472_317)
+  const game = (): BiggerCityState => ({ ...newBiggerCity([TOKYO, OSAKA, LYON], () => 0), pair: [OSAKA, TOKYO], seen: [OSAKA, TOKYO] })
+
+  it('explains the game, with the longest streak, and starts it', async () => {
+    const onStartBigger = vi.fn()
+    setup({ onStartBigger, best: { 'bigger-city': 7 } })
+    await openGame('Bigger city')
+    expect(screen.getByRole('heading', { name: 'Bigger city' })).toBeInTheDocument()
+    expect(screen.getByText('Best: 7 in a row')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+    expect(onStartBigger).toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: '← Cities' }))
+    expect(screen.getByRole('heading', { name: 'Cities' })).toBeInTheDocument()
+  })
+
+  it('asks which of two cities has more people, and shows both once picked', async () => {
+    const onPickCity = vi.fn()
+    setup({ game: game(), onPickCity, best: { 'bigger-city': 3 } })
+    expect(screen.getByText('Which has more people?')).toBeInTheDocument()
+    expect(screen.getByText('Best 3')).toBeInTheDocument()
+    const osaka = screen.getByRole('button', { name: /^Osaka/ })
+    expect(osaka).toHaveTextContent(/^OsakaJapan$/)
+    await userEvent.click(screen.getByRole('button', { name: /^Tokyo/ }))
+    expect(onPickCity).toHaveBeenCalledWith(TOKYO)
+    cleanup()
+    setup({ game: pickBigger(game(), TOKYO) })
+    expect(screen.getByRole('status')).toHaveTextContent('Right! Tokyo has 8.34 million people, Osaka 2.59 million.')
+    expect(screen.getByRole('button', { name: /^Tokyo/ })).toHaveClass('correct')
+    expect(screen.getByRole('button', { name: /^Osaka/ })).toHaveTextContent('OsakaJapan2.59 million')
+    expect(screen.getByText('Streak 1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
+  })
+
+  it('ends at a wrong pick with the streak, and what was right', async () => {
+    const onStartBigger = vi.fn()
+    setup({ game: pickBigger(game(), OSAKA), previousBest: 0, onStartBigger })
+    expect(screen.getByText('0', { selector: '.big-score' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Osaka/ })).toHaveClass('wrong')
+    expect(screen.getByText('Tokyo has more people than Osaka.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    expect(onStartBigger).toHaveBeenCalled()
   })
 })
 

@@ -12,7 +12,7 @@ import { valueOf } from './games/higherLower'
 import { ACHIEVEMENTS } from './visited/achievements'
 import { SUN_UPDATE_MS } from './globe/hooks'
 import { SETTINGS_KEY } from './explore/useSettings'
-import { countryOfCity, loadCities } from './data/cities'
+import { countryOfCity, loadCities, type City } from './data/cities'
 import { distanceKm } from './data/flights'
 import { spotOnKm } from './games/cityGame'
 import { loadAirports } from './data/airports'
@@ -2229,6 +2229,31 @@ describe('App', () => {
       const pins = (pinLayer.show.mock.calls.at(-1)?.[0] ?? []) as { city: { name: string } }[]
       expect(pins.map((pin) => pin.city.name)).toEqual([name])
       expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.correct)
+    })
+
+    it('bigger city: pins both cities, in view, then green or red as picked, and keeps the longest streak', async () => {
+      render(<App />)
+      await userEvent.click(screen.getByRole('button', { name: 'Games' }))
+      await openGame('Bigger city')
+      globe.pointOfView.mockClear()
+      await userEvent.click(screen.getByRole('button', { name: 'Play' }))
+      const pinnedCities = () => ((pinLayer.show.mock.calls.at(-1)?.[0] ?? []) as { city: City }[]).map((pin) => pin.city)
+      await waitFor(() => expect(pinnedCities()).toHaveLength(2))
+      expect(painted()).toEqual({})
+      expect(lastFlight()).toBeDefined()
+      expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.pin)
+      const ranked = () => [...pinnedCities()].sort((a, b) => b.population - a.population)
+
+      const [bigger] = ranked()
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${bigger.name}`) }))
+      expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.correct)
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }))
+      expect(pinnedCities()).not.toContain(bigger)
+      const [, smaller] = ranked()
+      await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${smaller.name}`) }))
+      expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.wrong)
+      expect(screen.getByText('1', { selector: '.big-score' })).toBeInTheDocument()
+      expect(JSON.parse(localStorage.getItem('countries-app.best-scores')!)).toMatchObject({ 'bigger-city': 1 })
     })
 
     it('higher or lower: lights up both countries, and ends at the first wrong guess with the streak', async () => {

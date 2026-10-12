@@ -14,10 +14,10 @@ export const isPlaying = (game: GameState | null): game is GameState & { finishe
 /**
  * The globe shows the game: while playing, and for the letter hunt and
  * "name them all" also on the results (what was missed), and for higher or
- * lower (the pair it ended on)
+ * lower and bigger city (the pair it ended on)
  */
 export const showsGame = (game: GameState | null) =>
-  isPlaying(game) || game?.kind === 'letter' || game?.kind === 'all' || game?.kind === 'higher'
+  isPlaying(game) || game?.kind === 'letter' || game?.kind === 'all' || game?.kind === 'higher' || game?.kind === 'bigger'
 
 /** Island countries up to this size (km²) are hard to spot out in the ocean */
 export const SMALL_ISLAND_KM2 = 30_000
@@ -68,8 +68,8 @@ export function gameHighlights(game: GameState | null, theme: Theme): ReadonlyMa
     else if (game.last?.result === 'wrong-letter') colors.set(game.last.country, theme.wrong)
     return colors
   }
-  // Finding a city marks it with a pin, not a country
-  if (game.kind === 'city') return NONE
+  // Finding a city marks it with a pin, not a country, as does bigger city its two
+  if (game.kind === 'city' || game.kind === 'bigger') return NONE
   if (game.kind === 'neighbours') {
     // The country asked about, its neighbours named, and once the round is over those missed
     colors.set(currentNeighbours(game).country, theme.selected)

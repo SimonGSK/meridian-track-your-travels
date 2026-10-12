@@ -14,7 +14,7 @@ export const BEST_TIMES_KEY = 'countries-app.best-times'
  */
 export function isPerfect(game: GameState) {
   // A streak game keeps its longest streak, not a time
-  if (!game.finished || game.kind === 'higher') return false
+  if (!game.finished || game.kind === 'higher' || game.kind === 'bigger') return false
   if (game.kind === 'rounds') return !game.stoppedEarly && game.score === maxScore(game)
   // Every city within spot on
   if (game.kind === 'city') return game.score === maxCityScore(game)

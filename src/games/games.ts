@@ -17,8 +17,9 @@ export type GameId =
   | 'all'
   | 'higher'
   | 'neighbours'
+  | 'bigger-city'
 /** Games played in rounds, at a difficulty (the daily challenge mixes the others) */
-export type RoundGameId = Exclude<GameId, 'letter' | 'all' | 'higher' | 'city' | 'neighbours'>
+export type RoundGameId = Exclude<GameId, 'letter' | 'all' | 'higher' | 'city' | 'neighbours' | 'bigger-city'>
 /** What a round asks: one of the quizzes */
 export type QuizKind = Exclude<RoundGameId, 'daily'>
 /** "all" goes through every country, instead of 10 rounds */
@@ -67,6 +68,12 @@ export const GAMES: { id: GameId; title: string; description: string; category: 
     category: 'Cities',
   },
   { id: 'city-country', title: 'Whose city?', description: 'Which country is this city in?', category: 'Cities' },
+  {
+    id: 'bigger-city',
+    title: 'Bigger city',
+    description: 'Which of two cities has more people? Keep the streak going.',
+    category: 'Cities',
+  },
   {
     id: 'higher',
     title: 'Higher or lower',
