@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BufferAttribute, BufferGeometry, Color, LineBasicMaterial, LineSegments, Mesh, MeshLambertMaterial, Points, PointsMaterial, Vector3 } from 'three'
+import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
+  Color,
+  LineBasicMaterial,
+  LineSegments,
+  Mesh,
+  MeshLambertMaterial,
+  Points,
+  PointsMaterial,
+  ShaderMaterial,
+  Vector3,
+} from 'three'
 import { borders, countries } from '../countries'
-import { createCountryLayer, createRaisedCountry } from './countryLayer'
+import { GLOW_LIFT, NIGHT_GLOW, createCountryLayer, createRaisedCountry } from './countryLayer'
+import { toUnitVector } from './sphereMesh'
 
 const LAND = '#48a078'
 const HOVER = '#ffc850'
@@ -17,8 +31,9 @@ describe('createCountryLayer', () => {
   const hex = (color: string) => new Color(color).getHexString()
 
   it('draws all countries as one mesh and one set of lines, with markers and dots for tiny places', () => {
-    expect(layer.object.children).toHaveLength(4)
-    expect(layer.object.children.filter((c) => c instanceof Mesh)).toHaveLength(1)
+    expect(layer.object.children).toHaveLength(5)
+    // The land, and its glow at night over a picture of the Earth
+    expect(layer.object.children.filter((c) => c instanceof Mesh)).toHaveLength(2)
     expect(layer.object.children.filter((c) => c instanceof LineSegments)).toHaveLength(1)
     expect(layer.object.children.filter((c) => c instanceof Points)).toHaveLength(2)
   })
@@ -64,6 +79,29 @@ describe('createCountryLayer', () => {
     layer.paint(denmark, LAND)
     layer.setSeeThrough(false)
     expect(material.transparent).toBe(false)
+  })
+
+  it('makes the places painted over a picture of the Earth glow back through the night, where the sun has set', () => {
+    const glow = layer.object.getObjectByName('night-glow') as Mesh<BufferGeometry, ShaderMaterial>
+    // The land's own shape and colors, as much as each place is painted, added over the night
+    expect(glow.geometry).toBe(land.geometry)
+    expect(glow.material).toMatchObject({ blending: AdditiveBlending, depthWrite: false })
+    expect(glow.material.uniforms.strength.value).toBe(NIGHT_GLOW)
+    expect(glow.renderOrder).toBeGreaterThan(-1) // after the night, which would darken it
+    // A hair above the land, so it never sinks into it in patches
+    expect(glow.scale.toArray()).toEqual([1 + GLOW_LIFT, 1 + GLOW_LIFT, 1 + GLOW_LIFT])
+    expect(glow.visible).toBe(false)
+    layer.setNight({ lat: 10, lng: 20 })
+    expect(glow.visible).toBe(false) // not over plain land, which it would light up
+    layer.setSeeThrough(true)
+    expect(glow.visible).toBe(true)
+    expect((glow.material.uniforms.sun.value as Vector3).toArray()).toEqual(toUnitVector([20, 10]))
+    layer.setNight(null)
+    expect(glow.visible).toBe(false)
+    layer.setNight({ lat: 0, lng: 0 })
+    layer.setSeeThrough(false)
+    expect(glow.visible).toBe(false)
+    layer.setNight(null)
   })
 
   it('queues both countries for upload when switching hover in one frame', () => {

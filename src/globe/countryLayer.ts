@@ -1,4 +1,5 @@
 import {
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -12,6 +13,8 @@ import {
   MeshLambertMaterial,
   Points,
   PointsMaterial,
+  ShaderMaterial,
+  Vector3,
   type ColorRepresentation,
 } from 'three'
 import GeoJsonGeometry from 'three-geojson-geometry'
@@ -19,6 +22,7 @@ import type { MultiLineString } from 'geojson'
 import type { CountryFeature } from '../countries'
 import { densifyRing, toUnitVector, triangulatePolygon } from './sphereMesh'
 import { LAND_ALTITUDE } from './style'
+import { NIGHT_GLSL } from './nightLayer'
 
 /** How far borders float above the land, as a fraction of its radius */
 const BORDER_LIFT = 0.0004
@@ -28,6 +32,15 @@ const TINY_LIFT = 0.0002
 export const MARKER_SIZE_PX = 12
 /** On-screen size of the dot on tiny places that are game answers */
 export const EMPHASIS_SIZE_PX = 16
+/** How much of their color places painted over a picture of the Earth glow with at night, back through the dark */
+export const NIGHT_GLOW = 0.3
+/**
+ * How far the glow floats above the land, as a fraction of its radius: drawn
+ * by another shader, at the land's very height its depth would come out a
+ * hair off here and there, hiding it in flickering patches. Below tiny
+ * places, which are lifted over their bigger neighbors (TINY_LIFT).
+ */
+export const GLOW_LIFT = 0.0001
 
 export type CountryLayer = {
   object: Group
@@ -43,6 +56,11 @@ export type CountryLayer = {
   setRings(places: readonly CountryFeature[], color: ColorRepresentation | null): void
   /** Big filled dots on tiny places in these colors (game answers), so they can be seen at any zoom */
   emphasize(colors: ReadonlyMap<CountryFeature, ColorRepresentation>): void
+  /**
+   * Where the sun is overhead, while night is shown, for the places painted over a picture of the Earth to glow
+   * back through it (it darkens them so much they'd be lost); null without night
+   */
+  setNight(sun: { lat: number; lng: number } | null): void
   dispose(): void
 }
 
@@ -90,6 +108,49 @@ export function createCountryLayer(
   landGeometry.setAttribute('color', colors)
 
   const land = new Mesh(landGeometry, new MeshLambertMaterial({ vertexColors: true }))
+
+  // Places painted over a picture of the Earth, glowing on the side the sun has set on: their color added over the
+  // night, as much as they're painted (none for those not painted), so they show without hiding the city lights
+  const sun = new Vector3(1, 0, 0)
+  const nightGlow = new Mesh(
+    landGeometry,
+    new ShaderMaterial({
+      uniforms: { sun: { value: sun }, strength: { value: NIGHT_GLOW } },
+      vertexShader: `
+        attribute vec4 color;
+        varying vec4 paint;
+        varying vec3 direction;
+        void main() {
+          paint = color;
+          direction = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 sun;
+        uniform float strength;
+        varying vec4 paint;
+        varying vec3 direction;
+        ${NIGHT_GLSL}
+        void main() {
+          float night = nightAt(dot(normalize(direction), sun));
+          gl_FragColor = vec4(paint.rgb * paint.a * night * strength, 1.0);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    }),
+  )
+  nightGlow.name = 'night-glow'
+  nightGlow.scale.setScalar(1 + GLOW_LIFT)
+  // After the night, which is drawn before (at -1), so it isn't darkened
+  nightGlow.renderOrder = 0
+  nightGlow.visible = false
+  let night = false
+  const showGlow = () => {
+    nightGlow.visible = night && land.material.transparent
+  }
 
   // Borders sit just above the land so they never sink into it
   const lines = new LineSegments(
@@ -154,7 +215,7 @@ export function createCountryLayer(
 
   const object = new Group()
   object.name = 'countries'
-  object.add(land, lines, markers, emphasis)
+  object.add(land, nightGlow, lines, markers, emphasis)
 
   const paintColor = new Color()
   return {
@@ -184,6 +245,7 @@ export function createCountryLayer(
       if (land.material.transparent === on) return
       land.material.transparent = on
       land.material.needsUpdate = true
+      showGlow()
     },
     setBorders(color, opacity) {
       lines.material.color.set(color)
@@ -204,9 +266,15 @@ export function createCountryLayer(
       emphasisGeometry.setAttribute('position', new Float32BufferAttribute(position, 3))
       emphasisGeometry.setAttribute('color', new Float32BufferAttribute(color, 3))
     },
+    setNight(at) {
+      night = at !== null
+      if (at) sun.set(...toUnitVector([at.lng, at.lat]))
+      showGlow()
+    },
     dispose() {
       landGeometry.dispose()
       land.material.dispose()
+      nightGlow.material.dispose()
       lines.geometry.dispose()
       lines.material.dispose()
       markerGeometry.dispose()

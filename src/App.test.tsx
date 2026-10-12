@@ -82,6 +82,7 @@ const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightL
       setBorders: vi.fn(),
       setRings: vi.fn(),
       emphasize: vi.fn(),
+      setNight: vi.fn(),
       dispose: vi.fn(),
     },
     regionLayer: { object: {}, show: vi.fn(), setOutlineColor: vi.fn(), setFillOpacity: vi.fn(), dispose: vi.fn() },
@@ -1904,6 +1905,15 @@ describe('App', () => {
       render(<App />)
       expect(nightLayer.setPicture).toHaveBeenLastCalledWith(nightLights.picture)
       expect(nightLayer.setDarkness).toHaveBeenLastCalledWith(PICTURE_DARKNESS)
+    })
+
+    it('tells the countries where the sun is, for your places to glow through the night, and when there is none', async () => {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showDayNight: true }))
+      render(<App />)
+      expect(layer.setNight.mock.lastCall![0]).toMatchObject({ lat: expect.any(Number), lng: expect.any(Number) })
+      await openLayers()
+      await userEvent.click(screen.getByRole('switch', { name: /Day and night/ }))
+      expect(layer.setNight).toHaveBeenLastCalledWith(null)
     })
 
     it("lights each city as a dot instead, should the picture not load", async () => {

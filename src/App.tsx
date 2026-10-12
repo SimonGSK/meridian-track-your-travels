@@ -713,7 +713,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // too, always, in a color that shows over the sea
   const rings = gameRings(game, settings.showMarkers) ?? (settings.showMarkers ? tinyPlaces : NO_RINGS)
   const ringColor = rings === LETTER_HUNT_RINGS ? theme.flight : null
-  useCountryLayer(globe, theme, colorOf, { rings, ringColor, emphasized: gameColors })
+  // Night as it is now; not in games, where it would hide what to find
+  const nightShown = settings.showDayNight && !showsGame(game)
+  useCountryLayer(globe, theme, colorOf, { rings, ringColor, emphasized: gameColors, night: nightShown })
   useSelectedCountry(globe, editing ? null : selected, theme.selected)
 
   // A hovered country's visited states turn the hover color with it (only countries with states matter here)
@@ -817,7 +819,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // Night as it is now, lit by the Earth's lights at night as seen from space; not in games, where it would hide what
   // to find. Should the picture not load (offline before it was kept), each city is a dot of light instead. A picture of
   // the Earth (the Realistic design) has its night as dark as from space, the lights bright on it
-  const nightShown = settings.showDayNight && !showsGame(game)
   const nightLights = useNightLights(nightShown && settings.showCityLights)
   useNightLayer(
     globe,

@@ -59,12 +59,15 @@ export function useCountryLayer(
     rings = tinyPlaces,
     ringColor = null,
     emphasized = NOTHING_EMPHASIZED,
+    night = false,
   }: {
     /** Places with a ring around them */
     rings?: readonly CountryFeature[]
     /** One color for the rings, but for the countries a game colors; else each its country's */
     ringColor?: string | null
     emphasized?: ReadonlyMap<CountryFeature, string>
+    /** Whether night is shown, for places painted over a picture of the Earth to glow through it */
+    night?: boolean
   } = {},
 ) {
   const layer = useRef<CountryLayer | null>(null)
@@ -92,6 +95,19 @@ export function useCountryLayer(
   useEffect(() => {
     layer.current?.setRings(rings, ringColor)
   }, [globe, rings, ringColor])
+
+  // Where the sun is, as it moves on every minute, as the night does
+  useEffect(() => {
+    const current = layer.current
+    if (!current || !night) return
+    const moveSun = () => current.setNight(subsolarPoint(new Date()))
+    moveSun()
+    const timer = setInterval(moveSun, SUN_UPDATE_MS)
+    return () => {
+      clearInterval(timer)
+      current.setNight(null)
+    }
+  }, [globe, night])
 
   useEffect(() => {
     layer.current?.emphasize(emphasized)
