@@ -575,6 +575,23 @@ describe('App', () => {
       render(<App />)
       await waitFor(() => expect(painted()).toEqual({ Denmark: DEFAULT_THEME.visited }))
     })
+
+    it('shows the places of your trips, and those to come, with the layers as you have them', async () => {
+      const nextYear = new Date().getFullYear() + 1
+      withTrips({ items: [['Denmark', '2023-07']] }, { items: [['Japan', `${nextYear}-03`]] })
+      localStorage.setItem('countries-app.visited-cities', JSON.stringify([2618425]))
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ showCities: false, showMarkers: false }))
+      render(<App />)
+      await waitFor(() =>
+        expect(painted()).toEqual({
+          Denmark: DEFAULT_THEME.visited,
+          Japan: plannedColor(DEFAULT_THEME, DEFAULT_THEME.land as string),
+        }),
+      )
+      expect((planLayer.show.mock.lastCall![0] as CountryFeature[]).map((c) => c.properties.name)).toEqual(['Japan'])
+      expect(pinLayer.show).toHaveBeenLastCalledWith([])
+      expect(layer.setRings).toHaveBeenLastCalledWith([], null)
+    })
   })
 
   describe('menu', () => {

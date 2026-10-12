@@ -2,6 +2,7 @@ import { fromBase64Url, toBase64Url } from './base64url'
 import { THEME_STORAGE_KEY } from './design/useTheme'
 import { SETTINGS_KEY } from './explore/useSettings'
 import { FLIGHTS_KEY } from './visited/useFlights'
+import { TRIPS_KEY } from './visited/useTrips'
 import { VISITED_STORAGE_KEY } from './visited/useVisited'
 import { VISITED_CITIES_KEY } from './visited/useVisitedCities'
 import { VISITED_REGIONS_KEY } from './visited/useVisitedRegions'
@@ -16,12 +17,17 @@ import { WISHLIST_KEY } from './visited/useWishlist'
 /** Where the screensaver file goes: screensavers can't read Documents, Desktop or Downloads */
 export const SCREENSAVER_FILE = '/Users/Shared/Meridian/index.html'
 
-/** What the screensaver shows: your places, states, cities, flights and wishlist, the design and the layers */
+/**
+ * What the screensaver shows: your places, states, cities, flights, trips
+ * (where your visits are, and those to come) and wishlist, the design and the
+ * layers
+ */
 const KEYS = [
   VISITED_STORAGE_KEY,
   VISITED_REGIONS_KEY,
   VISITED_CITIES_KEY,
   FLIGHTS_KEY,
+  TRIPS_KEY,
   WISHLIST_KEY,
   THEME_STORAGE_KEY,
   SETTINGS_KEY,

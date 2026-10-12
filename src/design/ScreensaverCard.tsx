@@ -48,8 +48,9 @@ export default function ScreensaverCard({ onPreview, back }: { onPreview: () => 
         </button>
       </div>
       <p className="muted small">
-        It doesn't update by itself. The address carries your places and design: after changing them, copy it again
-        and paste it in Options. After updating the app, run the build again.
+        It doesn't update by itself. The address carries your places, trips, design and layers: after changing them,
+        copy it again and paste it in Options. After updating the app, run the build again, or the screensaver won't
+        know what's new.
       </p>
     </Card>
   )
