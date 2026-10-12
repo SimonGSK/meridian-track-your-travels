@@ -20,6 +20,7 @@ import { guess, newHigherLower, nextPair, type Guess, type HigherLowerState, typ
 import { DAILY_KEY, dayKey, isDailyResults, newDailyGame, squaresOf, type DailyResults } from './daily'
 import { guessCity, newCityGame, nextCity, skipCity, type CityGameState, type CityLevel } from './cityGame'
 import { loadCities } from '../data/cities'
+import { newCityCountryGame } from './cityCountry'
 import {
   nameNeighbour,
   neighboursPercent,
@@ -120,7 +121,11 @@ export function useGame() {
   )
 
   const start = useCallback(
-    (id: RoundGameId, difficulty: Difficulty) => begin(newRoundGame(id, difficulty)),
+    (id: RoundGameId, difficulty: Difficulty) => {
+      // "Whose city?" asks about cities, which load with the app
+      if (id === 'city-country') void loadCities().then((cities) => begin(newCityCountryGame(difficulty, cities)))
+      else begin(newRoundGame(id, difficulty))
+    },
     [begin],
   )
   const startAll = useCallback((scope: Scope) => begin(newAllGame(scope)), [begin])

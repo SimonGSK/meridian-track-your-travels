@@ -76,10 +76,10 @@ describe('GamesPanel: choosing a game', () => {
       'Name them all',
     ])
     expect(await titles('Capitals')).toEqual(['Capital quiz', 'Whose capital?'])
+    expect(await titles('Cities')).toEqual(['Find the city', 'Whose city?'])
     // A kind with one game opens it, and goes back to all games
     for (const [kind, game] of [
       ['Flags', 'Flag quiz'],
-      ['Cities', 'Find the city'],
       ['Facts', 'Higher or lower'],
     ]) {
       await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${kind}`) }))
@@ -487,6 +487,49 @@ describe('GamesPanel: time records', () => {
     await userEvent.click(screen.getByRole('button', { name: '← Countries' }))
     await userEvent.click(screen.getByRole('button', { name: /^Name them all/ }))
     expect(screen.getByRole('button', { name: /^Oceania/ })).toHaveTextContent('record 1:35.0')
+  })
+})
+
+describe('GamesPanel: whose city?', () => {
+  /** Each round names a city, here one made up in the country to answer */
+  const cityGame = (difficulty: Difficulty = 'easy') => {
+    const game = roundGame('city-country', difficulty)
+    return {
+      ...game,
+      rounds: game.rounds.map((round) => ({
+        ...round,
+        city: { id: 1, name: `Town of ${round.target.properties.name}`, place: 'XX', lat: 0, lng: 0, population: 1 },
+      })),
+    }
+  }
+
+  it('names a city, to pick its country from four on easy', async () => {
+    const game = cityGame()
+    const { target } = game.rounds[0]
+    setup({ game })
+    expect(screen.getByText('Which country is this city in?')).toBeInTheDocument()
+    expect(screen.getByText(`Town of ${target.properties.name}`)).toHaveClass('game-target')
+    expect(screen.getAllByRole('button', { name: target.properties.name })).toHaveLength(1)
+    cleanup()
+    setup({ game: answer(game, target) })
+    expect(screen.getByRole('status')).toHaveTextContent(`Correct! Town of ${target.properties.name} is in ${target.properties.name}.`)
+  })
+
+  it('takes a typed country on medium, saying where the city is when wrong', () => {
+    const game = cityGame('medium')
+    const { target } = game.rounds[0]
+    const wrong = pool.find((c) => c !== target)!
+    setup({ game: answer(game, wrong) })
+    expect(screen.getByRole('status')).toHaveTextContent(
+      `Town of ${target.properties.name} is in ${target.properties.name}, not ${wrong.properties.name}.`,
+    )
+  })
+
+  it('offers no "All countries" level', async () => {
+    setup()
+    await openGame('Whose city?')
+    expect(screen.getByRole('button', { name: /^Easy/ })).toHaveTextContent('The biggest city of big countries, but not the capital')
+    expect(screen.queryByRole('button', { name: /^All countries/ })).not.toBeInTheDocument()
   })
 })
 
