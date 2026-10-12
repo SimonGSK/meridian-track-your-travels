@@ -109,6 +109,8 @@ import {
   useSmoothAutoRotate,
 } from './globe/hooks'
 import { PIN_FADE, SCREENSAVER_PIN_FADE, pinAt } from './globe/pinLayer'
+import { NIGHT_DARKNESS, PICTURE_DARKNESS } from './globe/nightLayer'
+import { useNightLights } from './globe/nightLights'
 import { heatColors, hoveredRegionColor, revisitColor, visitedRegionColor } from './globe/themes'
 import type { LatLng, Point, Spot } from './globe/interaction'
 import {
@@ -812,14 +814,17 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // And how far it reaches: anywhere in there is spot on
   const cityArea = useMemo(() => (cityAnswer ? [areaAround(cityAnswer.city, spotOnKm(cityAnswer.city))] : []), [cityAnswer])
   usePlanLayer(globe, cityArea, theme.correct, 'city-area')
-  // Night as it is now, lit by the cities; not in games, where it would hide what to find
-  // With a picture of the Earth's lights at night, the cities are lit in it, rather than as dots
-  const nightPicture = settings.showCityLights ? (imagery?.night ?? null) : null
+  // Night as it is now, lit by the Earth's lights at night as seen from space; not in games, where it would hide what
+  // to find. Should the picture not load (offline before it was kept), each city is a dot of light instead. A picture of
+  // the Earth (the Realistic design) has its night as dark as from space, the lights bright on it
+  const nightShown = settings.showDayNight && !showsGame(game)
+  const nightLights = useNightLights(nightShown && settings.showCityLights)
   useNightLayer(
     globe,
-    settings.showDayNight && !showsGame(game),
-    (!nightPicture && settings.showCityLights && cities) || NO_LIGHTS,
-    nightPicture,
+    nightShown,
+    (nightLights.failed && settings.showCityLights && cities) || NO_LIGHTS,
+    nightLights.picture,
+    nightLights.picture && theme.imagery ? PICTURE_DARKNESS : NIGHT_DARKNESS,
   )
 
   // Each route once, and a plane for each trip, flying its flights in order; those picked in the list stand out. In

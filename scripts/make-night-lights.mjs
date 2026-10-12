@@ -1,4 +1,4 @@
-// The Realistic design's city lights at night: NASA's Earth at night (by way
+// The city lights at night, in every design: NASA's Earth at night (by way
 // of three-globe's examples) with only its lights kept, on black. In the
 // picture they're dots a pixel or two wide on moonlit land and sea, so shrunk
 // to fit the globe they'd blur into the blue around them and be lost; on

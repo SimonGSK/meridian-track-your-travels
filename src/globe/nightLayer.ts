@@ -18,7 +18,7 @@ import { LAND_ALTITUDE } from './style'
 const NIGHT_LIFT = 0.0015
 /** How dark full night is: dark enough to see, light enough to still read the map */
 export const NIGHT_DARKNESS = 0.62
-/** How dark under a picture of the Earth's lights at night: as from space, the lights bright on it */
+/** How dark the night of a picture of the Earth is: as from space, the lights bright on it */
 export const PICTURE_DARKNESS = 0.8
 /** How bright the picture's lights are */
 const PICTURE_GAIN = 2.5
@@ -47,6 +47,8 @@ export type NightLayer = {
   setLights(lights: readonly Light[]): void
   /** A picture of the Earth's lights at night, on black, to light the side the sun has set on; or none */
   setPicture(picture: Texture | null): void
+  /** How dark full night is */
+  setDarkness(darkness: number): void
   dispose(): void
 }
 
@@ -165,7 +167,9 @@ export function createNightLayer(globeRadius: number): NightLayer {
       const { uniforms } = shell.material
       uniforms.picture.value = picture
       uniforms.hasPicture.value = picture ? 1 : 0
-      uniforms.darkness.value = picture ? PICTURE_DARKNESS : NIGHT_DARKNESS
+    },
+    setDarkness(darkness) {
+      shell.material.uniforms.darkness.value = darkness
     },
     setLights(cities) {
       const lightRadius = radius * (1 + NIGHT_LIFT)

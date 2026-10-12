@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
 import type { GlobeMethods } from 'react-globe.gl'
-import { RepeatWrapping, SRGBColorSpace, TextureLoader, type PerspectiveCamera, type Texture } from 'three'
+import { SRGBColorSpace, TextureLoader, type PerspectiveCamera, type Texture } from 'three'
 import { geoDistance } from 'd3-geo'
 import { borders, countries, findCountryNear, tinyPlaces, type CountryFeature } from '../countries'
 import { loadCities, type City } from '../data/cities'
@@ -12,7 +12,7 @@ import { createFlightLayer, type FlightJourney, type FlightLayer, type FlightLin
 import { loadAirports, type Airport } from '../data/airports'
 import { createRegionLayer, type RegionLayer } from './regionLayer'
 import { createPlanLayer, type Outlined, type PlanLayer } from './planLayer'
-import { createNightLayer, type Light } from './nightLayer'
+import { NIGHT_DARKNESS, createNightLayer, type Light } from './nightLayer'
 import { subsolarPoint } from './sun'
 import { approach, isClick, type LatLng, type Point } from './interaction'
 import { screenToLatLng } from './picking'
@@ -362,7 +362,7 @@ export const useCities = (): City[] | null => useLoaded(loadCities)
 
 type Imagery = NonNullable<Theme['imagery']>
 
-type Pictures = { map: Texture; water: Texture | null; relief: Texture | null; night: Texture | null }
+type Pictures = { map: Texture; water: Texture | null; relief: Texture | null }
 
 /** A design's pictures of the Earth, once loaded (null while loading, or for a design without) */
 export function useImagery(imagery: Theme['imagery']) {
@@ -374,17 +374,14 @@ export function useImagery(imagery: Theme['imagery']) {
     let textures: Texture[] = []
     const loader = new TextureLoader()
     const load = (url: string | undefined) => (url ? loader.loadAsync(url) : null)
-    Promise.all([load(imagery.map), load(imagery.water), load(imagery.relief), load(imagery.night)])
-      .then(([map, water, relief, night]) => {
+    Promise.all([load(imagery.map), load(imagery.water), load(imagery.relief)])
+      .then(([map, water, relief]) => {
         map!.colorSpace = SRGBColorSpace
         // Sharper at a slant, near the edge of the globe
         map!.anisotropy = 8
-        // The night picture is drawn as it is, by the night's own shader (no color space to convert from), and
-        // read around past its edges, at the date line
-        if (night) night.wrapS = RepeatWrapping
-        textures = [map, water, relief, night].filter((t) => t !== null)
+        textures = [map, water, relief].filter((t) => t !== null)
         if (gone) textures.forEach((t) => t.dispose())
-        else setLoaded({ of: imagery, map: map!, water, relief, night })
+        else setLoaded({ of: imagery, map: map!, water, relief })
       })
       .catch(() => {
         // Not there (offline before it was kept): the design's sea color stays
@@ -511,6 +508,7 @@ export function useNightLayer(
   shown: boolean,
   lights: readonly Light[],
   picture: Texture | null = null,
+  darkness = NIGHT_DARKNESS,
 ) {
   const layer = useRef<ReturnType<typeof createNightLayer> | null>(null)
 
@@ -538,6 +536,10 @@ export function useNightLayer(
   useEffect(() => {
     layer.current?.setPicture(picture)
   }, [globe, shown, picture])
+
+  useEffect(() => {
+    layer.current?.setDarkness(darkness)
+  }, [globe, shown, darkness])
 }
 
 /** Draws states and provinces over their countries: `fills` in their colors, and `outlines`. */
