@@ -418,6 +418,17 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   // What achievements are earned from, and the ones just earned
   const visitedCityList = useMemo(() => (cities ?? []).filter((c) => visitedCities.has(c.id)), [cities, visitedCities])
+  // Each trip been on: where it went, and the flights flown, in order (not those to come, nor trips with nothing yet)
+  const tripsTaken = useMemo(() => {
+    const now = new Date(`${today}T12:00`)
+    const been = (date: VisitDate | null | undefined) => !date || !isToCome(date, now)
+    return tripViews
+      .map((view) => ({
+        places: view.items.flatMap((item) => (item.kind === 'visit' && been(item.date) ? [item.place] : [])),
+        flights: view.routes.filter((route) => been(route.flight.date)),
+      }))
+      .filter((trip) => trip.places.length > 0 || trip.flights.length > 0)
+  }, [tripViews, today])
   const atlas = useMemo<Atlas>(
     () => ({
       visited,
@@ -425,8 +436,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       cities: visitedCityList,
       flights: routes,
       visitsTo: (name) => datesOf(name).length,
+      trips: tripsTaken,
     }),
-    [visited, visitedRegions, visitedCityList, routes, datesOf],
+    [visited, visitedRegions, visitedCityList, routes, datesOf, tripsTaken],
   )
   const [newAchievements, clearAchievements] = useNewAchievements(atlas, !!cities && !!airports)
 

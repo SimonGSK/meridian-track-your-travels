@@ -1177,6 +1177,20 @@ describe('App', () => {
       await openMore('Achievements')
       expect(screen.getByText('Road trip', { selector: '.achievement-title' }).closest('li')).toHaveTextContent('2 of 10')
     })
+
+    it('counts the trips been on, not those to come', async () => {
+      const nextYear = new Date().getFullYear() + 1
+      withTrips(
+        { items: [['Denmark', '2023-07'], ['Sweden', '2023-07'], ['Norway', '2023-07'], ['Finland', '2023-07'], ['Estonia', '2023-07']] },
+        { items: [['Japan', `${nextYear}-03`]] },
+      )
+      render(<App />)
+      await openMore('Achievements')
+      const item = (title: string) => screen.getByText(title, { selector: '.achievement-title' }).closest('li')
+      expect(item('Grand tour')).toHaveClass('earned')
+      expect(item('Off again')).toHaveTextContent('1 of 10')
+      expect(item('A trip to every continent')).toHaveTextContent('1 of 6')
+    })
   })
 
   describe('visited states', () => {

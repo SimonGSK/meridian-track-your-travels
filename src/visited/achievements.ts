@@ -1,4 +1,4 @@
-import { countries } from '../countries'
+import { countries, findCountryByName } from '../countries'
 import { CONTINENTS } from '../data/continents'
 import { regionIdsOf } from '../data/regions'
 import { beenTo } from '../data/sovereigns'
@@ -16,9 +16,14 @@ export type Atlas = {
   flights: readonly { km: number }[]
   /** How many times you've been to a country, by name */
   visitsTo: (name: string) => number
+  /** The trips been on: the places each went to, by name, and its flights flown, in order */
+  trips: readonly Trip[]
 }
 
-export const GROUPS = ['Milestones', 'Continents', 'Regions', 'Islands', 'States', 'Cities', 'Flights', 'Return trips'] as const
+type Point = { lat: number; lng: number }
+export type Trip = { places: readonly string[]; flights: readonly { from: Point; to: Point }[] }
+
+export const GROUPS = ['Milestones', 'Continents', 'Regions', 'Islands', 'States', 'Cities', 'Flights', 'Trips', 'Return trips'] as const
 export type Group = (typeof GROUPS)[number]
 
 export type Achievement = {
@@ -213,6 +218,21 @@ const formatKm = (n: number) => `${km.format(Math.round(n))} km`
 const totalKm = (atlas: Atlas) => atlas.flights.reduce((sum, f) => sum + f.km, 0)
 const mostVisits = (atlas: Atlas) => Math.max(0, ...[...atlas.visited].map(atlas.visitsTo))
 
+/** The countries a trip went to, a territory as the country it belongs to */
+const countriesOnTrip = (trip: Trip) => {
+  const been = beenTo(new Set(trip.places))
+  return allCountries.filter((c) => been.has(c.properties.name)).length
+}
+/** The continents a trip went to */
+const continentsOnTrip = (trip: Trip) =>
+  new Set(trip.places.flatMap((name) => findCountryByName(name)?.properties.continent ?? []))
+/**
+ * How far round the Earth a trip's flights went, east or west, in degrees:
+ * each flight the short way, so out and back again is none, and once round is 360
+ */
+const roundTheEarth = (trip: Trip) =>
+  Math.abs(trip.flights.reduce((sum, { from, to }) => sum + ((((to.lng - from.lng) % 360) + 540) % 360) - 180, 0))
+
 /** Every achievement, in the order shown */
 export const ACHIEVEMENTS: Achievement[] = [
   milestone(1, 'First stamp', 'Your first country'),
@@ -273,6 +293,19 @@ export const ACHIEVEMENTS: Achievement[] = [
   atLeast('long-haul', 'Flights', 'Long haul', 'A flight over 10,000 km', 1, (atlas) => atlas.flights.filter((f) => f.km > 10_000).length),
   atLeast('ultra-long-haul', 'Flights', 'Ultra long haul', 'A flight over 15,000 km', 1, (atlas) =>
     atlas.flights.filter((f) => f.km > 15_000).length,
+  ),
+
+  atLeast('trips-10', 'Trips', 'Off again', '10 trips', 10, (atlas) => atlas.trips.length),
+  atLeast('trip-countries-5', 'Trips', 'Grand tour', '5 countries in one trip', 5, (atlas) =>
+    Math.max(0, ...atlas.trips.map(countriesOnTrip)),
+  ),
+  atLeast('trip-every-continent', 'Trips', 'A trip to every continent', 'A trip to each of the six continents with countries', LIVED_ON.length, (atlas) => {
+    const reached = new Set(atlas.trips.flatMap((trip) => [...continentsOnTrip(trip)]))
+    return LIVED_ON.filter((continent) => reached.has(continent)).length
+  }),
+  atLeast('round-the-world', 'Trips', 'Round the world', 'One trip all the way round the Earth', 360, (atlas) =>
+    Math.round(Math.max(0, ...atlas.trips.map(roundTheEarth))),
+    (n) => `${n}°`,
   ),
 
   atLeast('visits-3', 'Return trips', 'Coming back', '3 visits to one country', 3, mostVisits),
