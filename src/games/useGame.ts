@@ -21,6 +21,8 @@ import { DAILY_KEY, dayKey, isDailyResults, newDailyGame, squaresOf, type DailyR
 import { guessCity, newCityGame, nextCity, skipCity, type CityGameState, type CityLevel } from './cityGame'
 import { loadCities } from '../data/cities'
 import { newCityCountryGame } from './cityCountry'
+import { newBiggerCity, nextBigger, pickBigger, type BiggerCityState } from './biggerCity'
+import type { City } from '../data/cities'
 import {
   nameNeighbour,
   neighboursPercent,
@@ -32,7 +34,14 @@ import {
 } from './neighboursGame'
 import type { LatLng } from '../globe/interaction'
 
-export type GameState = RoundGameState | LetterGameState | AllGameState | HigherLowerState | CityGameState | NeighboursState
+export type GameState =
+  | RoundGameState
+  | LetterGameState
+  | AllGameState
+  | HigherLowerState
+  | CityGameState
+  | NeighboursState
+  | BiggerCityState
 
 export const BEST_SCORES_KEY = 'countries-app.best-scores'
 
@@ -51,12 +60,15 @@ export const measureKey = (measure: Measure) => `higher:${measure}`
 export const cityKey = (level: CityLevel) => `city:${level}`
 /** Neighbours keeps a best share of the neighbours named, in percent, per level */
 export const neighboursKey = (level: NeighboursLevel) => `neighbours:${level}`
+/** "Bigger city" keeps its longest streak */
+export const BIGGER_CITY_KEY = 'bigger-city'
 function keyOf(game: GameState) {
   if (game.kind === 'letter') return letterKey(game.letter)
   if (game.kind === 'all') return scopeKey(game.scope)
   if (game.kind === 'higher') return measureKey(game.measure)
   if (game.kind === 'city') return cityKey(game.level)
   if (game.kind === 'neighbours') return neighboursKey(game.level)
+  if (game.kind === 'bigger') return BIGGER_CITY_KEY
   return bestKey(game.id, game.difficulty)
 }
 
@@ -68,12 +80,13 @@ export const isBestScores = (value: unknown): value is BestScores =>
 
 /**
  * Points; for the letter hunt and "name them all" the number of countries
- * found; for higher or lower the streak; for neighbours the share named
+ * found; for higher or lower and bigger city the streak; for neighbours the
+ * share named
  */
 export function gameScore(game: GameState) {
   if (game.kind === 'rounds' || game.kind === 'city') return game.score
   if (game.kind === 'neighbours') return neighboursPercent(game)
-  if (game.kind === 'higher') return game.streak
+  if (game.kind === 'higher' || game.kind === 'bigger') return game.streak
   return game.found.length
 }
 
@@ -137,6 +150,7 @@ export function useGame() {
     (level: CityLevel) => loadCities().then((cities) => begin(newCityGame(level, cities))),
     [begin],
   )
+  const startBigger = useCallback(() => loadCities().then((cities) => begin(newBiggerCity(cities))), [begin])
   /** Today's challenge, unless it's been played */
   const startDaily = useCallback(() => {
     const today = dayKey(new Date())
@@ -155,6 +169,14 @@ export function useGame() {
   const guessHigher = useCallback(
     (direction: Guess) => {
       if (game?.kind === 'higher') update(guess(game, direction))
+    },
+    [game, update],
+  )
+
+  /** Bigger city: this one has more people */
+  const pickCity = useCallback(
+    (city: City) => {
+      if (game?.kind === 'bigger') update(pickBigger(game, city))
     },
     [game, update],
   )
@@ -179,6 +201,7 @@ export function useGame() {
     else if (game.kind === 'higher') update(nextPair(game))
     else if (game.kind === 'city') update(nextCity(game))
     else if (game.kind === 'neighbours') update(nextNeighbours(game))
+    else if (game.kind === 'bigger') update(nextBigger(game))
     else update(next(game))
   }, [game, update])
 
@@ -210,7 +233,9 @@ export function useGame() {
     startHigher,
     startCity,
     startNeighbours,
+    startBigger,
     pick,
+    pickCity,
     guessAt,
     guessHigher,
     giveUpRound,

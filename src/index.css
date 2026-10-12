@@ -2372,6 +2372,26 @@ code {
   font-weight: 700;
 }
 
+/* Bigger city: each city's name, its country, and its people once picked */
+.bigger-pair .option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bigger-name {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.bigger-pair .muted {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
 /* The country to beat and the one to guess about, with their figures */
 .higher-pair {
   display: grid;

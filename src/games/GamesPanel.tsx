@@ -39,7 +39,9 @@ import {
   type RoundGameState,
 } from './games'
 import { countriesStartingWith, lettersOf, missing, randomLetter, type LetterGameState } from './letterGame'
-import { bestKey, gameScore, letterKey, scopeKey, type BestScores, type GameState } from './useGame'
+import { BIGGER_CITY_KEY, bestKey, gameScore, letterKey, scopeKey, type BestScores, type GameState } from './useGame'
+import { BiggerCityChoice, BiggerCityPlay, BiggerCityResults } from './BiggerCityPanel'
+import type { City } from '../data/cities'
 import { formatRunTime } from './records'
 import { Elapsed, RecordTime, RunTime } from './timing'
 import {
@@ -69,6 +71,10 @@ type Props = {
   onStartCity?: (level: CityLevel) => void
   /** Neighbours, at a level */
   onStartNeighbours?: (level: NeighboursLevel) => void
+  /** Bigger city */
+  onStartBigger?: () => void
+  /** Bigger city: this one has more people */
+  onPickCity?: (city: City) => void
   /** How each day's challenge went */
   daily?: DailyResults
   onStartDaily?: () => void
@@ -109,6 +115,10 @@ export default function GamesPanel(props: Props) {
   if (game.kind === 'higher') return <HigherLowerPlay {...props} game={game} />
   if (game.kind === 'city') return <CityPlay {...props} game={game} />
   if (game.kind === 'neighbours') return <NeighboursPlay {...props} game={game} />
+  if (game.kind === 'bigger') {
+    const { best, onNext, onQuit } = props
+    return <BiggerCityPlay game={game} best={best[BIGGER_CITY_KEY]} onPick={(city) => props.onPickCity?.(city)} onNext={onNext} onQuit={onQuit} />
+  }
   return <RoundPlay {...props} game={game} />
 }
 
@@ -140,6 +150,7 @@ function GameList(props: Props & Chosen) {
   if (chosen === 'neighbours') {
     return <NeighboursLevelChoice {...bests} onStart={(level) => props.onStartNeighbours?.(level)} {...back} />
   }
+  if (chosen === 'bigger-city') return <BiggerCityChoice best={best[BIGGER_CITY_KEY]} onStart={() => props.onStartBigger?.()} {...back} />
   const card = (g: (typeof GAMES)[number]) => (
     <li key={g.id}>
       <button type="button" className={`game-card${g.id === 'daily' ? ' daily' : ''}`} onClick={() => setChosen(g.id)}>
@@ -517,6 +528,15 @@ function Results(props: Props & Chosen & { game: GameState }) {
         onStart={(level) => props.onStartNeighbours?.(level)}
         onAllGames={allGames}
       />
+    )
+  }
+  if (game.kind === 'bigger') {
+    const allGames = () => {
+      setChosen(null)
+      onQuit()
+    }
+    return (
+      <BiggerCityResults game={game} previousBest={previousBest} onStart={() => props.onStartBigger?.()} onAllGames={allGames} />
     )
   }
   if (game.kind === 'rounds' && game.id === 'daily') {

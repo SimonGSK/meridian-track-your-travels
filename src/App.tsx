@@ -263,7 +263,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     startHigher,
     startCity,
     startNeighbours,
+    startBigger,
     pick,
+    pickCity,
     guessAt,
     guessHigher,
     giveUpRound,
@@ -784,21 +786,27 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   // "Whose city?": once answered, the city named
   const cityNamed = game?.kind === 'rounds' && !game.finished && game.answer ? (currentRound(game).city ?? null) : null
+  // "Bigger city": the two cities
+  const cityPair = game?.kind === 'bigger' ? game.pair : null
   // A pin on each visited city, standing on the selected country when it's raised; in "find the city" the answer's,
-  // and in "whose city?" the city named
+  // in "whose city?" the city named, and in "bigger city" the two
   const pinned = useMemo(() => {
     if (cityAnswer) return [{ city: cityAnswer.city, lat: cityAnswer.city.lat, lng: cityAnswer.city.lng, raised: false }]
     if (cityNamed) return [{ city: cityNamed, lat: cityNamed.lat, lng: cityNamed.lng, raised: false }]
+    if (cityPair) return cityPair.map((city) => ({ city, lat: city.lat, lng: city.lng, raised: false }))
     return cities && settings.showCities && !showsGame(game) && !yearShown && !replay && !compareOpen
       ? cities
           .filter((c) => visitedCities.has(c.id))
           .map((city) => ({ city, lat: city.lat, lng: city.lng, raised: !editing && countryOfCity(city) === selected }))
       : []
-  }, [cityAnswer, cityNamed, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
+  }, [cityAnswer, cityNamed, cityPair, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
+  // Answers in green; in "bigger city" once picked, green or red as the pick was
+  const pinColor =
+    cityAnswer || cityNamed ? theme.correct : game?.kind === 'bigger' && game.answer ? (game.answer.correct ? theme.correct : theme.wrong) : theme.pin
   usePinLayer(
     globe,
     pinned,
-    cityAnswer || cityNamed ? theme.correct : theme.pin,
+    pinColor,
     screensaver || previewing ? SCREENSAVER_PIN_FADE : PIN_FADE,
   )
   // And how far it reaches: anywhere in there is spot on
@@ -981,6 +989,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     const { city, guess } = cityAnswer
     flyToSee(guess.position ? spotsOfRoute({ from: guess.position, to: city }) : [{ lat: city.lat, lng: city.lng, radius: 4 }])
   }, [cityAnswer, flyToSee])
+  // "Bigger city": both cities in view, each new pair
+  useEffect(() => {
+    if (cityPair) flyToSee(spotsOfRoute({ from: cityPair[0], to: cityPair[1] }))
+  }, [cityPair, flyToSee])
 
   // Searching the globe starts from an overview, not zoomed in on the last answer
   const overview = overviewKey(game)
@@ -1003,6 +1015,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const playNeighbours = (level: NeighboursLevel) => {
     selectCountry(null)
     startNeighbours(level)
+  }
+  const playBigger = () => {
+    selectCountry(null)
+    void startBigger()
   }
   const playCity = (level: CityLevel) => {
     selectCountry(null)
@@ -1336,6 +1352,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                 onStartHigher={playHigher}
                 onStartCity={playCity}
                 onStartNeighbours={playNeighbours}
+                onStartBigger={playBigger}
+                onPickCity={pickCity}
                 daily={daily}
                 onStartDaily={playDaily}
                 onPick={pick}
