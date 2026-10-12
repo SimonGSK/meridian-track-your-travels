@@ -10,7 +10,7 @@ import type { CountryVisit } from './visited/CountryVisits'
 import ExplorePanel from './explore/ExplorePanel'
 import { useSettings } from './explore/useSettings'
 import GamesPanel from './games/GamesPanel'
-import { GAMES, type Difficulty, type GameChoice, type RoundGameId } from './games/games'
+import { GAMES, currentRound, type Difficulty, type GameChoice, type RoundGameId } from './games/games'
 import type { Scope } from './games/allGame'
 import {
   LETTER_HUNT_RINGS,
@@ -782,16 +782,25 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     [game],
   )
 
-  // A pin on each visited city, standing on the selected country when it's raised; in "find the city" the answer's
+  // "Whose city?": once answered, the city named
+  const cityNamed = game?.kind === 'rounds' && !game.finished && game.answer ? (currentRound(game).city ?? null) : null
+  // A pin on each visited city, standing on the selected country when it's raised; in "find the city" the answer's,
+  // and in "whose city?" the city named
   const pinned = useMemo(() => {
     if (cityAnswer) return [{ city: cityAnswer.city, lat: cityAnswer.city.lat, lng: cityAnswer.city.lng, raised: false }]
+    if (cityNamed) return [{ city: cityNamed, lat: cityNamed.lat, lng: cityNamed.lng, raised: false }]
     return cities && settings.showCities && !showsGame(game) && !yearShown && !replay && !compareOpen
       ? cities
           .filter((c) => visitedCities.has(c.id))
           .map((city) => ({ city, lat: city.lat, lng: city.lng, raised: !editing && countryOfCity(city) === selected }))
       : []
-  }, [cityAnswer, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
-  usePinLayer(globe, pinned, cityAnswer ? theme.correct : theme.pin, screensaver || previewing ? SCREENSAVER_PIN_FADE : PIN_FADE)
+  }, [cityAnswer, cityNamed, cities, settings.showCities, game, yearShown, replay, compareOpen, visitedCities, editing, selected])
+  usePinLayer(
+    globe,
+    pinned,
+    cityAnswer || cityNamed ? theme.correct : theme.pin,
+    screensaver || previewing ? SCREENSAVER_PIN_FADE : PIN_FADE,
+  )
   // And how far it reaches: anywhere in there is spot on
   const cityArea = useMemo(() => (cityAnswer ? [areaAround(cityAnswer.city, spotOnKm(cityAnswer.city))] : []), [cityAnswer])
   usePlanLayer(globe, cityArea, theme.correct, 'city-area')

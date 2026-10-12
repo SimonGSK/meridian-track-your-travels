@@ -649,7 +649,7 @@ test.describe('games', () => {
   test('find the city: a click anywhere on the globe is scored by how far off it is', async ({ page }) => {
     const { errors } = await openGlobe(page)
     await page.getByRole('button', { name: 'Games', exact: true }).click()
-    await openGame(page, 'Cities')
+    await openGame(page, 'Cities', 'Find the city')
     await page.getByRole('button', { name: /^Medium/ }).click()
     await expect(page.getByText('Round 1 of 10')).toBeVisible()
 

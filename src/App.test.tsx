@@ -12,7 +12,7 @@ import { valueOf } from './games/higherLower'
 import { ACHIEVEMENTS } from './visited/achievements'
 import { SUN_UPDATE_MS } from './globe/hooks'
 import { SETTINGS_KEY } from './explore/useSettings'
-import { loadCities } from './data/cities'
+import { countryOfCity, loadCities } from './data/cities'
 import { distanceKm } from './data/flights'
 import { spotOnKm } from './games/cityGame'
 import { loadAirports } from './data/airports'
@@ -2214,6 +2214,21 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: capital }))
       expect(feedback()).toHaveTextContent(`Correct! The capital of ${target} is ${capital}.`)
       expect(painted()).toEqual({ [target]: DEFAULT_THEME.correct })
+    })
+
+    it('whose city?: names a city, then lights up its country and pins the city', async () => {
+      await startGame('Whose city?')
+      const name = await waitFor(() => screen.getByText('Which country is this city in?').nextElementSibling!.textContent!)
+      expect(painted()).toEqual({})
+      // The biggest of its name, the one asked about
+      const city = (await loadCities()).filter((c) => c.name === name).sort((a, b) => b.population - a.population)[0]
+      const country = countryOfCity(city)!.properties.name
+      await userEvent.click(screen.getByRole('button', { name: country }))
+      expect(feedback()).toHaveTextContent(`Correct! ${name} is in ${country}.`)
+      expect(painted()).toEqual({ [country]: DEFAULT_THEME.correct })
+      const pins = (pinLayer.show.mock.calls.at(-1)?.[0] ?? []) as { city: { name: string } }[]
+      expect(pins.map((pin) => pin.city.name)).toEqual([name])
+      expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.correct)
     })
 
     it('higher or lower: lights up both countries, and ends at the first wrong guess with the streak', async () => {

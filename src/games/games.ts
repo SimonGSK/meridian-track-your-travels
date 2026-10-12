@@ -1,11 +1,13 @@
 import { countries, type CountryFeature } from '../countries'
 import { capitalOf } from '../data/capitals'
+import type { City } from '../data/cities'
 import { flagUrl } from '../flags'
 
 export type GameId =
   | 'daily'
   | 'find'
   | 'city'
+  | 'city-country'
   | 'flags'
   | 'name'
   | 'shape'
@@ -64,6 +66,7 @@ export const GAMES: { id: GameId; title: string; description: string; category: 
     description: 'We name a city, you click where it is. The closer, the more points.',
     category: 'Cities',
   },
+  { id: 'city-country', title: 'Whose city?', description: 'Which country is this city in?', category: 'Cities' },
   {
     id: 'higher',
     title: 'Higher or lower',
@@ -101,9 +104,22 @@ export const OPTION_COUNT = 4
 /** In "find the country": tries per round, and points for getting it on the first, second or third */
 export const MAX_TRIES = 3
 
+/** In "whose city?", the cities each difficulty asks about */
+const CITIES_ASKED: Partial<Record<Difficulty, string>> = {
+  easy: 'The biggest city of big countries, but not the capital',
+  medium: 'The big cities of all but the smallest countries',
+  hard: 'Any city in any country, even the small ones people know',
+}
+
+/** The difficulties a game offers: "whose city?" has no "all countries", as not every country has a city to ask about */
+export const difficultiesOf = (id: GameId) => DIFFICULTIES.filter((d) => id !== 'city-country' || d.id !== 'all')
+
 /** What a difficulty means for a game, e.g. "Big countries. Pick from four answers." */
 export function difficultyDescription(id: GameId, difficulty: Difficulty) {
   if (id === 'find' && difficulty === 'hard') return 'All but the biggest countries, even the tiniest.'
+  if (id === 'city-country') {
+    return `${CITIES_ASKED[difficulty]}. ${answerMode(id, difficulty) === 'choices' ? 'Pick from four answers.' : 'Type your answers.'}`
+  }
   const { countries } = DIFFICULTIES.find((d) => d.id === difficulty)!
   const mode = answerMode(id, difficulty)
   if (mode === 'choices') return `${countries}. Pick from four answers.`
@@ -157,6 +173,8 @@ export type Round = {
   target: CountryFeature
   /** Answer choices, including the target. Empty unless answering by choosing. */
   options: CountryFeature[]
+  /** In "whose city?": the city named, in the target country */
+  city?: City
 }
 
 export type Answer = {

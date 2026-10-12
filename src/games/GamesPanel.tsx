@@ -21,6 +21,7 @@ import {
   answerMode,
   currentRound,
   difficultyDescription,
+  difficultiesOf,
   gamesOf,
   listedUnder,
   maxScore,
@@ -223,7 +224,7 @@ function DifficultyChoice({ id, best, bestTimes, onStart, onBack, backTo }: {
       </p>
       <p className="game-prompt">Choose a difficulty</p>
       <ul className="game-list">
-        {DIFFICULTIES.map((d) => {
+        {difficultiesOf(id).map((d) => {
           const score = best[bestKey(id, d.id)]
           return (
             <li key={d.id}>
@@ -252,6 +253,7 @@ const PROMPTS: Record<QuizKind, string> = {
   shape: 'Which country has this shape?',
   capital: "What's the capital of",
   'capital-country': 'Which country has this capital?',
+  'city-country': 'Which country is this city in?',
 }
 
 /** The game and its difficulty, with a clock running since it started ("name them all" shows its own) */
@@ -294,6 +296,8 @@ function RoundPlay({ game, onPick, onDontKnow, onNext, onStop, onQuit }: Props &
   const isCapital = kind === 'capital'
   // The other way round: a capital, answered with its country
   const isCapitalCountry = kind === 'capital-country'
+  // Any city but a capital, answered with its country
+  const city = kind === 'city-country' ? currentRound(game).city : undefined
   const lastMiss = game.misses.at(-1)
   const triesLeft = MAX_TRIES - game.misses.length
 
@@ -305,6 +309,11 @@ function RoundPlay({ game, onPick, onDontKnow, onNext, onStop, onQuit }: Props &
       return `That's ${lastMiss.properties.name}. Try again: ${triesLeft} ${triesLeft === 1 ? 'try' : 'tries'} left.`
     }
     const points = isFind ? ` +${answer.points} ${answer.points === 1 ? 'point' : 'points'}` : ''
+    if (city) {
+      if (answer.correct) return `Correct! ${city.name} is in ${name}.`
+      if (!answer.picked || mode === 'choices') return `${city.name} is in ${name}.`
+      return `${city.name} is in ${name}, not ${answer.picked.properties.name}.`
+    }
     if (isCapitalCountry) {
       const capital = capitalOf(target)
       if (answer.correct) return `Correct! ${capital} is the capital of ${name}.`
@@ -347,6 +356,7 @@ function RoundPlay({ game, onPick, onDontKnow, onNext, onStop, onQuit }: Props &
       <p className="game-prompt">{PROMPTS[kind]}</p>
       {(isFind || isCapital) && <p className="game-target">{target.properties.name}</p>}
       {isCapitalCountry && <p className="game-target">{capitalOf(target)}</p>}
+      {city && <p className="game-target">{city.name}</p>}
       {isFind && !answer && (
         <p className="tries" aria-label={`Try ${game.misses.length + 1} of ${MAX_TRIES}`}>
           {Array.from({ length: MAX_TRIES }, (_, i) => (
