@@ -93,7 +93,7 @@ To set it up the first time, the repository has to be public (GitHub Pages is fr
 
 ## Screensaver
 
-The globe can be your Mac's screensaver, spinning with your places on it. With `?screensaver` in the address the app shows only the globe, and the pointer doesn't stop it. It looks at the globe from just north of the equator, so as it turns you see Europe and Canada but also Australia and New Zealand, and its pins stay until closer to the edge. A screensaver keeps its own storage, so the address carries your places, flights, wishlist, design and layers in its `#places=…` part.
+The globe can be your Mac's screensaver, spinning with your places on it. With `?screensaver` in the address the app shows only the globe, and the pointer doesn't stop it. It looks at the globe from just north of the equator, so as it turns you see Europe and Canada but also Australia and New Zealand, and its pins stay until closer to the edge. A screensaver keeps its own storage, so the address carries your places, flights, trips, wishlist, design and layers in its `#places=…` part. Trips to come show as on the globe, with Future visits and Future flights switched on.
 
 1. Run `npm run build:screensaver`. It builds the app into one self-contained file, `screensaver/index.html`, that opens from disk without a server, and copies it to `/Users/Shared/Meridian/` (screensavers can't read Documents, Desktop or Downloads).
 2. Install [WebViewScreenSaver](https://github.com/liquidx/webviewscreensaver) (Apache 2.0), which shows a web page as a screensaver: `brew install --cask webviewscreensaver`. (Its README adds `--no-quarantine`, but current Homebrew no longer has that option; macOS asks you to allow the screensaver instead, below.)
@@ -101,7 +101,7 @@ The globe can be your Mac's screensaver, spinning with your places on it. With `
 4. The first time, macOS blocks it: in System Settings › Privacy & Security, allow it on the message there.
 5. Back in Screen Saver, click Options and paste the screensaver address, which the app's Screensaver card, under More, copies for you.
 
-The screensaver doesn't update by itself. After changing your places or design, copy the address again and paste it in Options; after changing the app, run `npm run build:screensaver` again.
+The screensaver doesn't update by itself. After changing your places, design or layers, copy the address again and paste it in Options; after changing the app, run `npm run build:screensaver` again. An older screensaver doesn't know what's been added to the app since, so it leaves out what it can't show (a screensaver from before trips shows none of them), and one built before October 4th sets every layer back on when the address has layers it doesn't know.
 
 "Preview", next to the address in the Screensaver card, shows the screensaver right there in the app, to have a look: everything but the spinning globe steps aside, and the globe turns to the screensaver's view. An "Exit preview" button shows in the corner as it opens, and again when you move the mouse (with the pointer) or tap the screen on a phone; it and Escape bring everything back, with the Screensaver card still open. The real screensaver has neither.
 

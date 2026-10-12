@@ -674,9 +674,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     return undefined
   }, [compareShown, comparison, yearPicked, theme])
   const colorWishlist = yearShown || replay || compareShown || showsGame(game) || !settings.showWishlist ? NO_VISITS : wishlist
-  // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's), if switched on
-  const plansShown =
-    settings.showFutureVisits && !yearShown && !replay && !compareShown && !showsGame(game) && !previewing && !screensaver
+  // Places you're going to, tinted and outlined in dashes, on the globe as it is (not a year, a game or a friend's; in the
+  // screensaver too), if switched on
+  const plansShown = settings.showFutureVisits && !yearShown && !replay && !compareShown && !showsGame(game)
   // The places of trips to come you haven't been to yet
   const plannedNames = useMemo(
     () => new Set(visitsToCome.map((visit) => visit.place).filter((place) => !visited.has(place))),

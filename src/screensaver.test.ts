@@ -8,12 +8,15 @@ describe('screensaver', () => {
     expect(isScreensaver('')).toBe(false)
   })
 
-  it('carries places, the wishlist, design and layers to another storage through the address', () => {
+  it('carries places, trips, the wishlist, design and layers to another storage through the address', () => {
     localStorage.setItem('countries-app.visited', JSON.stringify(['Denmark', 'Côte d’Ivoire']))
     localStorage.setItem('countries-app.visited-cities', JSON.stringify([2618425]))
     localStorage.setItem('countries-app.design', JSON.stringify('vintage'))
     localStorage.setItem('countries-app.flights', JSON.stringify([{ id: 'a', from: 2618425, to: 1609350 }]))
     localStorage.setItem('countries-app.wishlist', JSON.stringify(['Peru']))
+    const trips = [{ id: 't', name: '', items: [{ kind: 'visit', place: 'Japan', date: '2099-03' }] }]
+    localStorage.setItem('countries-app.trips', JSON.stringify(trips))
+    localStorage.setItem('countries-app.settings', JSON.stringify({ showCities: false, showMarkers: false }))
     localStorage.setItem('countries-app.best-scores', JSON.stringify({ 'flags:easy': 9 })) // not needed there
     const packed = packPlaces()
     expect(packed).toMatch(/^[\w-]+$/) // safe in an address as it is
@@ -25,6 +28,8 @@ describe('screensaver', () => {
     expect(localStorage.getItem('countries-app.design')).toBe('"vintage"')
     expect(JSON.parse(localStorage.getItem('countries-app.flights')!)).toEqual([{ id: 'a', from: 2618425, to: 1609350 }])
     expect(localStorage.getItem('countries-app.wishlist')).toBe('["Peru"]')
+    expect(JSON.parse(localStorage.getItem('countries-app.trips')!)).toEqual(trips)
+    expect(JSON.parse(localStorage.getItem('countries-app.settings')!)).toEqual({ showCities: false, showMarkers: false })
     expect(localStorage.getItem('countries-app.best-scores')).toBeNull()
   })
 

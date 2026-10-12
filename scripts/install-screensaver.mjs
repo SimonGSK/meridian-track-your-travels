@@ -12,5 +12,5 @@ if (platform() !== 'darwin') {
 } else {
   await mkdir(FOLDER, { recursive: true })
   await copyFile(SOURCE, `${FOLDER}/index.html`)
-  console.log(`Copied the screensaver to ${FOLDER}/index.html. Paste the address from the Design tab into WebViewScreenSaver.`)
+  console.log(`Copied the screensaver to ${FOLDER}/index.html. Paste the address from More › Screensaver into WebViewScreenSaver.`)
 }
