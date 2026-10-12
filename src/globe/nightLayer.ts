@@ -29,7 +29,7 @@ export const LIGHT_COLOR = '#ffd27f'
  * How dark it is where the sun is at `sine` (the sine of its height above
  * the horizon): day above, twilight down to 18° below, then night.
  */
-const NIGHT_GLSL = `
+export const NIGHT_GLSL = `
   float nightAt(float sine) {
     return 1.0 - smoothstep(-0.309, 0.035, sine);
   }
