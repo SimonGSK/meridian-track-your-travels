@@ -13,6 +13,8 @@ import { ACHIEVEMENTS } from './visited/achievements'
 import { SUN_UPDATE_MS } from './globe/hooks'
 import { SETTINGS_KEY } from './explore/useSettings'
 import { loadCities } from './data/cities'
+import { distanceKm } from './data/flights'
+import { spotOnKm } from './games/cityGame'
 import { loadAirports } from './data/airports'
 import { loadRegions } from './data/regions'
 import { REPLAY_GAP, REPLAY_LEAD_IN, REPLAY_PAUSE } from './data/replay'
@@ -34,7 +36,7 @@ import { openGame } from './test/openGame'
 
 // WebGL doesn't exist in jsdom, so the globe is replaced by a stand-in that
 // exposes what the app passes to it. Screen positions map to places by x.
-const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightLayer, planLayer, sceneObjects } = vi.hoisted(() => {
+const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightLayer, planLayer, areaLayer, sceneObjects } = vi.hoisted(() => {
   const listeners = new Map<string, Set<() => void>>()
   const sceneObjects = new Set<object>()
   const controls = {
@@ -86,6 +88,8 @@ const { PLACES, PIN_AT, globe, layer, regionLayer, pinLayer, flightLayer, nightL
     flightLayer: { object: {}, show: vi.fn(), setColors: vi.fn(), tick: vi.fn(), dispose: vi.fn() },
     nightLayer: { object: { night: true }, setSun: vi.fn(), setLights: vi.fn(), setPicture: vi.fn(), dispose: vi.fn() },
     planLayer: { object: {}, show: vi.fn(), setColor: vi.fn(), dispose: vi.fn() },
+    // The same kind of layer, outlining how far a city reaches in "find the city"
+    areaLayer: { object: {}, show: vi.fn(), setColor: vi.fn(), dispose: vi.fn() },
   }
 })
 
@@ -104,7 +108,9 @@ vi.mock('./globe/picking', () => ({
     PLACES[x] ?? (x >= 2000 && x < 2400 ? { lat: 12.3, lng: -64 + (x - 2000) * 0.02 } : null),
 }))
 vi.mock('./globe/regionLayer', () => ({ createRegionLayer: () => regionLayer }))
-vi.mock('./globe/planLayer', () => ({ createPlanLayer: () => planLayer }))
+vi.mock('./globe/planLayer', () => ({
+  createPlanLayer: (_: number, name?: string) => (name === 'city-area' ? areaLayer : planLayer),
+}))
 vi.mock('./globe/nightLayer', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./globe/nightLayer')>()),
   createNightLayer: () => nightLayer,
@@ -1979,6 +1985,8 @@ describe('App', () => {
       type Line = { from: { lat: number; lng: number }; to: { name: string }; highlighted: boolean }
       const lines = () => (flightLayer.show.mock.calls.at(-1)?.[0] ?? []) as Line[]
       const pins = () => ((pinLayer.show.mock.calls.at(-1)?.[0] ?? []) as { city: { name: string } }[]).map((p) => p.city.name)
+      /** The areas outlined: how far the city reaches */
+      const areas = () => (areaLayer.show.mock.calls.at(-1)?.[0] ?? []) as { geometry: GeoJSON.Polygon }[]
 
       it('scores a click by how far off it is, then shows the city, a line from the click, and both in view', async () => {
         await start()
@@ -1996,6 +2004,14 @@ describe('App', () => {
         expect(pinLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.correct)
         expect(lines()).toEqual([expect.objectContaining({ to: expect.objectContaining({ name: city }), highlighted: true })])
         expect(lastFlight()).toBeDefined()
+        // How far the city reaches, anywhere in which is spot on, outlined around it: at least 20 km
+        const [area] = areas()
+        expect(area.geometry.type).toBe('Polygon')
+        const target = (await loadCities()).find((c) => c.name === city)!
+        const edge = area.geometry.coordinates[0][0]
+        expect(distanceKm({ lat: edge[1], lng: edge[0] }, target)).toBeCloseTo(spotOnKm(target), 0)
+        expect(spotOnKm(target)).toBeGreaterThanOrEqual(20)
+        expect(areaLayer.setColor).toHaveBeenLastCalledWith(DEFAULT_THEME.correct)
 
         // Clicking again does nothing; the next city clears the globe
         click(CAPITAL_AT[city])
@@ -2003,6 +2019,7 @@ describe('App', () => {
         expect(cityTarget()).not.toBe(city)
         expect(pins()).toEqual([])
         expect(lines()).toEqual([])
+        expect(areas()).toEqual([])
       })
 
       it("shows the city after \"I don't know\", with no points", async () => {
@@ -2011,6 +2028,7 @@ describe('App', () => {
         await userEvent.click(screen.getByRole('button', { name: "I don't know" }))
         expect(feedback()).toHaveTextContent(`${city} is marked on the globe`)
         expect(pins()).toEqual([city])
+        expect(areas()).toHaveLength(1)
         expect(lines()).toEqual([])
         expect(screen.getByText('0 points')).toBeInTheDocument()
       })

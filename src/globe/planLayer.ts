@@ -9,22 +9,25 @@ const LIFT = 4 * MAX_SAG
 const DASH = 0.9
 const GAP = 0.6
 
+/** A place to outline: a country, or any area, like how far a city reaches */
+export type Outlined = Pick<CountryFeature, 'geometry'>
+
 export type PlanLayer = {
   object: Group
   /** Outlines these places, and no others */
-  show(places: readonly CountryFeature[]): void
+  show(places: readonly Outlined[]): void
   setColor(color: ColorRepresentation): void
   dispose(): void
 }
 
-const polygonsOf = ({ geometry }: CountryFeature) =>
+const polygonsOf = ({ geometry }: Outlined) =>
   geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
 
-/** Places you're going to, outlined in dashes */
-export function createPlanLayer(globeRadius: number): PlanLayer {
+/** Places you're going to, outlined in dashes (or other areas, under another name) */
+export function createPlanLayer(globeRadius: number, name = 'plans'): PlanLayer {
   const radius = globeRadius * (1 + LAND_ALTITUDE) * (1 + LIFT)
   const object = new Group()
-  object.name = 'plans'
+  object.name = name
   const material = new LineDashedMaterial({ dashSize: DASH, gapSize: GAP, transparent: true, opacity: 0.95 })
   let loops: LineLoop[] = []
 
