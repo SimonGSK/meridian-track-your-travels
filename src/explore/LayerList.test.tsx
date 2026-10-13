@@ -48,6 +48,7 @@ describe('LayerList', () => {
       'Heat map by visits',
       'Visited states',
       'Flights',
+      'Replay in screensaver',
       'Future flights',
       'Future visits',
       'Wishlist',
@@ -81,6 +82,18 @@ describe('LayerList', () => {
     expect(visits).not.toBeChecked()
     await userEvent.click(visits)
     expect(onChange).toHaveBeenCalledWith({ showFutureVisits: true })
+  })
+
+  it('offers the replay in the screensaver only while the flights are on, under them', async () => {
+    setup({ settings: { ...DEFAULT_SETTINGS, showFlights: false } })
+    expect(screen.queryByRole('switch', { name: /Replay in screensaver/ })).not.toBeInTheDocument()
+    cleanup()
+    const { onChange } = setup()
+    const replay = screen.getByRole('switch', { name: /Replay in screensaver/ })
+    expect(replay).toBeChecked()
+    expect(replay.closest('li')).toHaveClass('sublayer')
+    await userEvent.click(replay)
+    expect(onChange).toHaveBeenCalledWith({ showScreensaverReplay: false })
   })
 
   it('turns layers on and off', async () => {

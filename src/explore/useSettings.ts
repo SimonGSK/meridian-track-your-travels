@@ -16,6 +16,8 @@ export type Settings = {
   showCities: boolean
   /** Lines for the flights you've taken */
   showFlights: boolean
+  /** The screensaver replays your trips every so often, between spins, while the flights are shown */
+  showScreensaverReplay: boolean
   /** The flights booked for trips to come, dashed */
   showFutureFlights: boolean
   /** The places of trips to come, tinted and outlined in dashes */
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showRegions: true,
   showCities: true,
   showFlights: true,
+  showScreensaverReplay: true,
   showFutureFlights: true,
   showFutureVisits: true,
   showDayNight: false,

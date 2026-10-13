@@ -57,7 +57,7 @@ import { cityOf, countryOf } from './data/airports'
 import { FOLLOW_LEAD_IN, FOLLOW_STOP, followLandings, followSeconds } from './globe/follow'
 import FollowBar from './ui/FollowBar'
 import ReplayBar from './ui/ReplayBar'
-import { replayOf, replayedBy } from './data/replay'
+import { SCREENSAVER_FIRST_REPLAY_MS, SCREENSAVER_REPLAY_EVERY_MS, replayOf, replayedBy } from './data/replay'
 import UndoToast from './ui/UndoToast'
 import UpdateToast from './pwa/UpdateToast'
 import { useUpdateReady } from './pwa/useUpdateReady'
@@ -570,12 +570,18 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   /** The step of the replay begun last */
   const [replayAt, setReplayAt] = useState(-1)
   const canReplay = useMemo(() => replayOf(tripViews).steps.length > 0, [tripViews])
+  const playReplay = useCallback(
+    (reopen: boolean) => {
+      setReplayAt(-1)
+      setReplay({ ...replayOf(tripViews), startedAt: performance.now() / 1000, reopen })
+    },
+    [tripViews],
+  )
   const startReplay = () => {
     selectCountry(null)
     setShownRoutes(null)
     setFollowing(null)
-    setReplayAt(-1)
-    setReplay({ ...replayOf(tripViews), startedAt: performance.now() / 1000, reopen: isPhone() })
+    playReplay(isPhone())
     if (isPhone()) setView('explore')
   }
   const finishReplay = useCallback(() => {
@@ -598,6 +604,24 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     return () => timers.forEach(clearTimeout)
   }, [replay, flyToSee, finishReplay])
   const replayed = useMemo(() => (replay ? replayedBy(replay.steps, replayAt) : null), [replay, replayAt])
+  // As a screensaver (or its preview), your trips replayed every so often, between spins, if switched on with the
+  // flights: first soon, then after a good while of spinning, the globe turned back to the screensaver's view
+  const replaysAsScreensaver =
+    (screensaver || previewing) && !!globe && settings.showFlights && settings.showScreensaverReplay && canReplay
+  const replayedAsScreensaver = useRef(false)
+  useEffect(() => {
+    if (!replaysAsScreensaver || replay) return
+    const again = replayedAsScreensaver.current
+    if (again) globe.pointOfView({ ...SCREENSAVER_VIEW, lng: globe.pointOfView().lng }, 2000)
+    const timer = setTimeout(
+      () => {
+        replayedAsScreensaver.current = true
+        playReplay(false)
+      },
+      again ? SCREENSAVER_REPLAY_EVERY_MS : SCREENSAVER_FIRST_REPLAY_MS,
+    )
+    return () => clearTimeout(timer)
+  }, [replaysAsScreensaver, replay, globe, playReplay])
 
   // A selected country with states isn't raised: it stays flat so its states can be picked on the globe
   const editing = !playing && selected && hasRegions(selected) ? selected : null
@@ -1091,11 +1115,15 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const startPreview = () => {
     selectCountry(null)
     setShownRoutes(null)
+    replayedAsScreensaver.current = false
     setPreviewing(true)
     globe?.pointOfView(SCREENSAVER_VIEW, 1000)
   }
   // The same function each time, so the preview's Escape listener isn't replaced mid key press
-  const leavePreview = useCallback(() => setPreviewing(false), [])
+  const leavePreview = useCallback(() => {
+    setPreviewing(false)
+    setReplay(null)
+  }, [])
 
 
   const globeView = (
