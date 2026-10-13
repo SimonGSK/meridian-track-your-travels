@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CountryPanel from './CountryPanel'
@@ -39,6 +39,61 @@ describe('CountryPanel', () => {
     expect(fact('Inhabitants')).toHaveAttribute('title', expect.stringMatching(/^\d\.\d+ million$/))
     expect(fact('Area')).toHaveTextContent('42,920 km²')
     expect(screen.getByText(/^Source: World Bank \(CC BY 4\.0\) · 20\d\d$/)).toBeInTheDocument()
+  })
+
+  describe('local time and currency', () => {
+    const RATES = { date: '2026-10-13', rates: { EUR: 1, DKK: 7.5, JPY: 175, USD: 1.1, PAB: 1.1 } }
+    const showWith = (name: string, currency = 'DKK') =>
+      render(
+        <CountryPanel
+          country={byName(name)}
+          visited={false}
+          onToggleVisited={() => {}}
+          onClose={() => {}}
+          money={{ currency, rates: RATES }}
+        />,
+      )
+    const notes = (term: string) =>
+      [...screen.getByText(term, { selector: 'dt' }).parentElement!.querySelectorAll('.fact-note')].map((dd) => dd.textContent)
+    afterEach(() => vi.useRealTimers())
+
+    it('shows the time at the capital under the figures, and how far ahead of yours it is', () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-07-01T12:00:00Z') })
+      const yours = -new Date().getTimezoneOffset()
+      showWith('Japan')
+      expect(fact('Local time')).toHaveTextContent('21:00')
+      const ahead = 540 - yours
+      expect(notes('Local time')[0]).toMatch(ahead === 0 ? /^Same time as you$/ : ahead > 0 ? /ahead of you$/ : /behind you$/)
+      expect(notes('Local time')).toHaveLength(1)
+    })
+
+    it('says a place has several times, and that the one shown is the capital', () => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-01-15T12:00:00Z') })
+      showWith('United States')
+      expect(fact('Local time')).toHaveTextContent('07:00')
+      expect(notes('Local time')[1]).toBe('In the capital, of 6 time zones')
+    })
+
+    it("says what a round sum of the place's money is worth in yours", () => {
+      showWith('Japan')
+      expect(fact('Currency')).toHaveTextContent('100 JPY = 4.29 DKK')
+      expect(notes('Currency')).toEqual(['Japanese Yen'])
+      expect(screen.getByText(/rates of 13 Oct$/)).toBeInTheDocument()
+    })
+
+    it('says when the money is yours, and names every currency a place uses', () => {
+      showWith('Denmark')
+      expect(fact('Currency')).toHaveTextContent(/^DKK$/)
+      expect(notes('Currency')).toEqual(['Danish Krone, as yours'])
+      showWith('Panama', 'EUR')
+      expect(screen.getAllByText('Panamanian Balboa, and US Dollar')).toHaveLength(1)
+    })
+
+    it('shows no currency without yours, the time all the same', () => {
+      show('Japan')
+      expect(screen.queryByText('Currency', { selector: 'dt' })).not.toBeInTheDocument()
+      expect(screen.getByText('Local time', { selector: 'dt' })).toBeInTheDocument()
+    })
   })
 
   it('shortens the biggest areas', () => {

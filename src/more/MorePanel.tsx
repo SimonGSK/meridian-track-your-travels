@@ -1,12 +1,13 @@
-import { useId, type ReactNode } from 'react'
+import { useId, type ComponentProps, type ReactNode } from 'react'
 import ScreensaverCard from '../design/ScreensaverCard'
-import { ChevronIcon, DownloadIcon, MonitorIcon, PeopleIcon, PhoneIcon, TrophyIcon } from '../icons'
+import { ChevronIcon, DownloadIcon, MoneyIcon, MonitorIcon, PeopleIcon, PhoneIcon, TrophyIcon } from '../icons'
 import { useInstall } from '../pwa/install'
 import AppCard from '../settings/AppCard'
 import BackupCard from '../settings/BackupCard'
+import CurrencyCard from '../settings/CurrencyCard'
 import Card from '../ui/Card'
 
-export type MoreId = 'achievements' | 'compare' | 'backup' | 'app' | 'screensaver'
+export type MoreId = 'achievements' | 'compare' | 'currency' | 'backup' | 'app' | 'screensaver'
 
 type Props = {
   /** What's opened, or null for the list of all of it */
@@ -21,13 +22,16 @@ type Props = {
   compare: ReactNode
   /** Shows the screensaver in the app, to have a look */
   onPreview: () => void
+  /** Your currency: chosen, or automatic from where you are, and the rates */
+  currency: Omit<ComponentProps<typeof CurrencyCard>, 'back'>
 }
 
 /**
  * The More tab: your achievements, comparing with a friend, and the
  * settings, each a small card opening to all of it, with a way back
  */
-export default function MorePanel({ open, onOpen, earned, achievementCount, achievements, friend, compare, onPreview }: Props) {
+export default function MorePanel(props: Props) {
+  const { open, onOpen, earned, achievementCount, achievements, friend, compare, onPreview, currency } = props
   const { installed } = useInstall()
 
   const back = (
@@ -51,6 +55,7 @@ export default function MorePanel({ open, onOpen, earned, achievementCount, achi
       </Card>
     )
   }
+  if (open === 'currency') return <CurrencyCard {...currency} back={back} />
   if (open === 'backup') return <BackupCard back={back} />
   if (open === 'app') return <AppCard back={back} />
   if (open === 'screensaver') return <ScreensaverCard onPreview={onPreview} back={back} />
@@ -67,6 +72,9 @@ export default function MorePanel({ open, onOpen, earned, achievementCount, achi
       </ul>
       <h3 className="more-heading">Settings</h3>
       <ul className="more-list" aria-label="Settings">
+        <Item icon={<MoneyIcon size={18} />} title="Currency" onOpen={() => onOpen('currency')}>
+          {currency.chosen ?? `${currency.guess}, from your time zone`}
+        </Item>
         <Item icon={<DownloadIcon size={18} />} title="Backup" onOpen={() => onOpen('backup')}>
           Keep your places safe in a file
         </Item>

@@ -3,10 +3,12 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import MorePanel, { type MoreId } from './MorePanel'
+import { BUNDLED_RATES } from '../data/money'
 
-/** The panel, keeping what's open as the app does */
+/** The panel, keeping what's open, and the currency chosen, as the app does */
 function Panel({ onPreview = vi.fn(), friend = null }: { onPreview?: () => void; friend?: string | null }) {
   const [open, setOpen] = useState<MoreId | null>(null)
+  const [chosen, choose] = useState<string | null>(null)
   return (
     <MorePanel
       open={open}
@@ -17,6 +19,7 @@ function Panel({ onPreview = vi.fn(), friend = null }: { onPreview?: () => void;
       friend={friend}
       compare={<p>the comparison</p>}
       onPreview={onPreview}
+      currency={{ chosen, guess: 'DKK', onChoose: choose, rates: BUNDLED_RATES }}
     />
   )
 }
@@ -47,9 +50,22 @@ describe('MorePanel', () => {
     render(<Panel />)
     expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
     const settings = within(screen.getByRole('list', { name: 'Settings' }))
-    expect(settings.getAllByRole('button')).toHaveLength(3)
-    for (const name of ['Backup', 'App', 'Screensaver']) expect(settings.getByRole('button', { name })).toBeInTheDocument()
+    expect(settings.getAllByRole('button')).toHaveLength(4)
+    for (const name of ['Currency', 'Backup', 'App', 'Screensaver']) expect(settings.getByRole('button', { name })).toBeInTheDocument()
     expect(settings.queryByRole('button', { name: 'Achievements' })).not.toBeInTheDocument()
+  })
+
+  it('picks your currency, automatic from your time zone at first', async () => {
+    render(<Panel />)
+    expect(screen.getByRole('button', { name: 'Currency' })).toHaveAccessibleDescription('DKK, from your time zone')
+    await userEvent.click(screen.getByRole('button', { name: 'Currency' }))
+    const select = screen.getByRole('combobox', { name: 'Your currency' })
+    expect(select).toHaveDisplayValue('Automatic: DKK, Danish Krone (from your time zone)')
+    expect(screen.getByRole('region', { name: 'Currency' })).toHaveTextContent(/Rates of \d+ \w+ \d{4}, from the open currency-api/)
+    await userEvent.selectOptions(select, 'JPY')
+    expect(select).toHaveDisplayValue('JPY, Japanese Yen')
+    await back()
+    expect(screen.getByRole('button', { name: 'Currency' })).toHaveAccessibleDescription('JPY')
   })
 
   it('names the friend you compare with', () => {

@@ -383,6 +383,62 @@ input:focus-visible {
   white-space: nowrap;
 }
 
+/* Local time and the currency, side by side under the figures, or one alone across */
+.fact-below {
+  border-top: 1px solid var(--line);
+}
+
+.fact:not(.fact-below) + .fact-below {
+  border-left: none;
+}
+
+.fact-alone {
+  grid-column: 1 / -1;
+}
+
+/* "100 JPY =" and "4.23 DKK", on one line where they fit */
+.fact-exchange {
+  white-space: normal;
+}
+
+.fact-exchange span {
+  white-space: nowrap;
+}
+
+/* Your currency, in its card under More › Settings */
+.field-label {
+  display: block;
+  margin: 16px 0 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.currency-select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(3, 10, 18, 0.45);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.currency-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.facts dd.fact-note {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .facts-note,
 .facts-source {
   margin: 8px 2px 0;

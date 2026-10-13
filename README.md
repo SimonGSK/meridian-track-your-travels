@@ -13,9 +13,9 @@ An interactive 3D globe for keeping track of where you've been. Mark the countri
 
 ## What's in it
 
-Spin the globe, hover a country to see its name and flag, and click it to fly there and see its capital, inhabitants and area.
+Spin the globe, hover a country to see its name and flag, and click it to fly there and see its capital, inhabitants and area, the time there, and what its money is worth in yours.
 
-The design (navy and amber, after a mock-up made in Lovable) has a top bar with the four tabs, where the globe is looking and how many places you've visited. The selected country shows on the left: its ISO code, capital, inhabitants and area, the cities you've visited there, its states, and a button to put it in your visited atlas. The open tab's cards are on the right. On phones the tabs move to the bottom and panels open as sheets (Explore's two buttons stay in the top corner), with the tab's name and a close button above the cards, which scroll under them. A sheet, a tab's or a country's, opens midway and can be swiped: up, it goes all the way up, from just under the top bar, to see more; down from there, it goes back to midway (or closes, swiped far); down from midway, it closes. Swipe from its top (the little bar), or from anywhere in it: down once what's in it is scrolled to the top, and up while it's midway (all the way up, swiping up scrolls). It follows the finger, and goes where it's let go a quarter of the way, or flicked; otherwise it springs back.
+The design (navy and amber, after a mock-up made in Lovable) has a top bar with the four tabs, where the globe is looking and how many places you've visited. The selected country shows on the left: its ISO code, capital, inhabitants and area, its local time and currency, the cities you've visited there, its states, and a button to put it in your visited atlas. The open tab's cards are on the right. On phones the tabs move to the bottom and panels open as sheets (Explore's two buttons stay in the top corner), with the tab's name and a close button above the cards, which scroll under them. A sheet, a tab's or a country's, opens midway and can be swiped: up, it goes all the way up, from just under the top bar, to see more; down from there, it goes back to midway (or closes, swiped far); down from midway, it closes. Swipe from its top (the little bar), or from anywhere in it: down once what's in it is scrolled to the top, and up while it's midway (all the way up, swiping up scrolls). It follows the finger, and goes where it's let go a quarter of the way, or flicked; otherwise it springs back.
 
 - **Explore**: two round buttons in the corner, on phones too, so the globe has the room. There's always a tab open: the app opens in Explore, and closing another panel (×, Escape, or swiping its sheet down) goes back to it. The magnifying glass opens a search of the whole atlas, countries by any name and cities. The layers button opens the designs and the layers.
 
@@ -75,7 +75,7 @@ The design (navy and amber, after a mock-up made in Lovable) has a top bar with 
   Games played in rounds (all but the letter hunt, "name them all", higher or lower and bigger city) are Easy (big countries, four answers to pick from), Medium (all but the smallest), Hard (all 197) or All countries (every one of the 197, one after another; stop whenever you like). Beyond Easy you type answers with no suggestions; any known spelling counts ("East Timor", "Burma", "Ceylon"), punctuation and spacing don't matter, and the answer shows the name used today. Tiny countries that are answers get a dot so you can see them. Rounds have an "I don't know" button that shows the answer; the round counts as wrong. Every game is about the 197 countries only: clicking or typing a territory (Greenland, Puerto Rico…) counts neither way, and territories don't light up under the pointer or get a ring.
 
   A clock runs while you play. Perfect runs set a time record to beat, next to the best score: every point (in *Find the country*, every country on the first try; in *Find the city*, every city spot on; in *Neighbours*, every neighbour without a mistake), no wrong letters in the letter hunt, and played to the end. Being fast with a mistake doesn't count. The clock stops at the last answer, not when you look at the results. Higher or lower keeps its longest streak instead.
-- **More**: a small card for each thing, opening to all of it, with "← Back" to go back: your achievements and comparing with a friend, then, under Settings, backing up everything to a file or restoring a backup (below), installing Meridian as an app that works offline (below), and how to make the globe your Mac's screensaver.
+- **More**: a small card for each thing, opening to all of it, with "← Back" to go back: your achievements and comparing with a friend, then, under Settings, your currency (below), backing up everything to a file or restoring a backup (below), installing Meridian as an app that works offline (below), and how to make the globe your Mac's screensaver.
 
   **Achievements**: 62 to earn from where you've been (a territory counting for its country, so the Faroe Islands are Denmark for Scandinavia), in nine groups: milestones (your first country, then 10 up to all 197), continents (every continent, all of one, Antarctica, all four hemispheres), regions (Scandinavia, the Nordics, the Baltics, Benelux, the Caribbean, the Gulf, the Stans, the G7 and more), islands, states (every US state and D.C., all of Canada, Australia or Brazil), cities and capitals, flights and distance flown (around the world, to the Moon, long haul), trips (10 trips, 5 countries in one trip, a trip to every continent, and one trip all the way round the Earth, its flights going east or west 360°), and return trips (one country 3 or 5 times). Each shows how far along you are ("3 of 5"), and a note pops up at the bottom when something you add earns one; click it to see them all. They're worked out from what you've saved, so a backup brings them back too.
 
@@ -107,7 +107,7 @@ The screensaver doesn't update by itself. After changing your places, design or 
 
 ## Backup
 
-Visited places, when you went and your notes, states, cities, flights and trip names, the wishlist, visits planned, a friend you compare with, best scores and times, daily challenges, the design and the settings are saved in your browser (`localStorage`). Nothing is sent anywhere, so clearing the browser's site data, or moving to another browser or computer, would leave them behind. Under More, **Download backup** saves all of it to a file (`meridian-backup-2026-10-04.json`, readable JSON), and shows when you last did. **Restore from a backup…** reads one, says what it holds and when it was made, and only replaces what's in this browser when you confirm. Every part of the file is checked the way the app checks it when loading, so a damaged or foreign file is refused as a whole rather than half restored.
+Visited places, when you went and your notes, states, cities, flights and trip names, the wishlist, visits planned, a friend you compare with, best scores and times, daily challenges, the design, the settings and your currency are saved in your browser (`localStorage`). Nothing is sent anywhere, so clearing the browser's site data, or moving to another browser or computer, would leave them behind. Under More, **Download backup** saves all of it to a file (`meridian-backup-2026-10-04.json`, readable JSON), and shows when you last did. **Restore from a backup…** reads one, says what it holds and when it was made, and only replaces what's in this browser when you confirm. Every part of the file is checked the way the app checks it when loading, so a damaged or foreign file is refused as a whole rather than half restored.
 
 Removing something by mistake is easy to take back: removing a country, a visit, a city, a flight, a place on the wishlist or a friend shows a note at the bottom ("Removed Japan · Undo") for eight seconds. **Undo**, or Cmd/Ctrl+Z when you're not typing, puts it back as it was: a visit with its note, a flight where it was among the others (so its trip stays the same). Only the last removal can be undone.
 
@@ -125,7 +125,7 @@ It's called just Meridian. An app installed under an earlier name (it was "Merid
 
 After the first visit it works offline, installed or not: the globe, your places and flights, the cities and airports, and every game. The build writes a service worker (`sw.js`, by `vite.offline.ts`) that keeps a copy of every file of the app, with a version made from their contents. Online, the page comes from the network, so a new build is noticed. Once the new version has been downloaded, in the background, a note at the bottom says "A new version is ready": **Reload** switches to it at once, and otherwise it takes over the next time the app is opened. Either way the old copy is cleared. While the app stays open, it looks for a new version every hour and whenever you come back to it. The service worker runs only in the production build served over the web (not `npm run dev`, nor the screensaver). Browsers allow one only on `https://` or `localhost`.
 
-Built with React, TypeScript and Vite, using [react-globe.gl](https://github.com/vasturiano/react-globe.gl) (three.js) for the globe, [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth 1:50m) for country shapes and [flag-icons](https://github.com/lipis/flag-icons) for flags. The fonts are Fraunces, Inter and JetBrains Mono (SIL Open Font License), from Fontsource. Flags and fonts are bundled, so no requests go to third parties.
+Built with React, TypeScript and Vite, using [react-globe.gl](https://github.com/vasturiano/react-globe.gl) (three.js) for the globe, [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth 1:50m) for country shapes and [flag-icons](https://github.com/lipis/flag-icons) for flags. The fonts are Fraunces, Inter and JetBrains Mono (SIL Open Font License), from Fontsource. Flags and fonts are bundled, so no requests go to third parties, but for the day's exchange rates (below).
 
 ## Getting started
 
@@ -156,6 +156,9 @@ To see the app with someone's travels already in it, run `npm run dev:demo` and 
 | `npm run data:extra` | Regenerate `src/data/extra-countries.json` (places too small for the 1:50m map) |
 | `npm run data:regions` | Regenerate `src/data/regions.json` (states and provinces) |
 | `npm run data:facts` | Download capitals, population and area from the World Bank into `src/data/country-facts.json` |
+| `npm run data:time-zones` | Read each place's time zones from the system's `zone.tab` into `src/data/time-zones.json` |
+| `npm run data:currencies` | Download which currencies each place uses from the Unicode CLDR into `src/data/currencies.json` |
+| `npm run data:rates` | Download a recent day's exchange rates into `src/data/rates.json`, bundled for offline |
 | `npm run data:cities` | Regenerate `src/data/cities.json` (each place's big and well-known cities, with their states where the map has them) |
 | `npm run data:city-sizes` | Measure how far each city in `src/data/cities.json` reaches (run it again after `data:cities`; downloads Natural Earth's urban areas, 28 MB, or give their path) |
 | `npm run data:airports` | Download the airports with scheduled flights from OurAirports into `src/data/airports.json` |
@@ -203,12 +206,15 @@ src/
     savedTrips.ts      trips made by hand, the only record of visits: visits and flights in order, what's in none,
                        where something new goes, and what there was before (dates, plans) put into trips
     replay.ts          replaying your trips, oldest first, as a timeline of flights flown and places reached
+    localTime.ts       each place's time zones and the time there (data in time-zones.json)
+    money.ts           each place's currency, what it's worth in yours, and a guess at yours
+                       (data in currencies.json, rates bundled in rates.json)
   storage.ts           state saved in the browser
   base64url.ts         packing text into an address, for the screensaver and a friend's link
   screensaver.ts       the screensaver mode, and carrying your places in its address
   demo.ts              sample data for `npm run dev:demo`
   ui/                  the cards with "GAMES ··· 06" headers, the boxes of figures, the key in the globe's corner,
-                       and keeping password managers off the text boxes
+                       keeping password managers off the text boxes, and a clock that moves on each minute
   nav/                 the top bar, tabs, the column of cards on the right
   explore/             the Explore tab's buttons: the atlas search, and the designs and layers, with their settings
   visited/             visited countries, states and cities; the wishlist; a friend to compare with; flights, and the airport search;
@@ -216,7 +222,8 @@ src/
                        each year's review (yearInReview.ts) and its view
   design/              design picker, how to set up the screensaver, and the way out of its preview
   more/                the More tab's small cards, each opening to all of it
-  settings/            backups: making, checking and restoring them, and their card; installing the app
+  settings/            backups: making, checking and restoring them, and their card; installing the app;
+                       your currency and the day's rates (useCurrency.ts), and their card
   pwa/                 the service worker (serviceWorker.ts, written into the build by vite.offline.ts),
                        starting it, and the browser's offer to install
   games/               game rules (games.ts, letterGame.ts, higherLower.ts, daily.ts, cityGame.ts, cityCountry.ts, biggerCity.ts,
@@ -273,6 +280,10 @@ Some corrections to the map data:
 - **Tuvalu and Gibraltar** are too small for the 1:50m map and are copied from the 1:10m map.
 - **The Maldives** are in the map but are a few tiny atolls, so like other small places they get a marker.
 - **Monaco's area.** The World Bank gives 75 km²; it's about 2 km², set in `country-facts-extra.json`.
+
+**Local time and currency.** Under a country's inhabitants and area, its panel shows the time at its capital ("06:42"), and how far ahead of yours ("7 h ahead of you"); a place with several times (the USA's 29 time zones are 6 times) says so, and that the one shown is the capital's. Beside it, what a round sum of its money is worth in yours: "100 JPY = 4.23 DKK", the smallest of 1, 10, 100… worth at least one of yours, with the currency's name, or "as yours" when it's the same. Your currency is a setting under More › Settings › Currency; until you pick one it's guessed from your device's time zone (set by where you are, so Copenhagen's is the Danish krone), else the region of your language, without asking for your location.
+
+The time zones are the IANA time zone database's `zone.tab` (public domain), which lists every zone with its country and the place it's named for: `scripts/extract-time-zones.mjs` (`npm run data:time-zones`) reads the system's copy into `src/data/time-zones.json`, the zone nearest to each capital first; Kosovo, with none of its own, has Skopje's. Which currencies each place uses today come from the Unicode [CLDR](https://github.com/unicode-org/cldr-json) (Unicode License), the locale data browsers are built on (`npm run data:currencies`). The rates, per euro, are the open [currency-api](https://github.com/fawazahmed0/exchange-api) (public domain): those of a recent day are bundled (`npm run data:rates`), so it works offline straight away, and the app fetches the day's from it at most once a day, only when you open a country's panel (or the Currency card) and are online. That's the one request the app makes to a third party; it carries nothing of yours. The panel says from which day the rates are.
 
 Capitals, population (2024) and total area come from the [World Bank's open data](https://data.worldbank.org/) (CC BY 4.0). Places it doesn't cover (Taiwan, Vatican City, Western Sahara and several territories) use recent censuses and estimates from `src/data/country-facts-extra.json`, marked as estimates in the app. Somalia's and Cyprus's figures include Somaliland and Northern Cyprus.
 
