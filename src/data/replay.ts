@@ -20,6 +20,10 @@ export const REPLAY_PAUSE = 1
 /** And between trips */
 export const REPLAY_GAP = 0.6
 
+/** As a screensaver, how long it spins before the first replay, and between replays after that */
+export const SCREENSAVER_FIRST_REPLAY_MS = 10_000
+export const SCREENSAVER_REPLAY_EVERY_MS = 90_000
+
 /** How long a flight takes, replayed: briskly, as there are many; Copenhagen to Doha about 2 seconds */
 export const replaySeconds = ({ from, to }: { from: { lat: number; lng: number }; to: { lat: number; lng: number } }) =>
   0.8 + geoDistance([from.lng, from.lat], [to.lng, to.lat]) * 1.4

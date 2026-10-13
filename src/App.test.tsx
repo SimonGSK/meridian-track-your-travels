@@ -18,7 +18,7 @@ import { NIGHT_DARKNESS, PICTURE_DARKNESS } from './globe/nightLayer'
 import { spotOnKm } from './games/cityGame'
 import { loadAirports } from './data/airports'
 import { loadRegions } from './data/regions'
-import { REPLAY_GAP, REPLAY_LEAD_IN, REPLAY_PAUSE } from './data/replay'
+import { REPLAY_GAP, REPLAY_LEAD_IN, REPLAY_PAUSE, SCREENSAVER_FIRST_REPLAY_MS, SCREENSAVER_REPLAY_EVERY_MS } from './data/replay'
 import {
   DEFAULT_THEME,
   NIGHT,
@@ -604,6 +604,52 @@ describe('App', () => {
       localStorage.setItem('countries-app.visited', JSON.stringify(['Denmark']))
       render(<App />)
       await waitFor(() => expect(painted()).toEqual({ Denmark: DEFAULT_THEME.visited }))
+    })
+
+    describe('replaying your trips', () => {
+      const play = (ms: number) => act(() => vi.advanceTimersByTime(ms))
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+        withTrips({ items: [['Denmark', '2023-07'], ['Sweden', '2023-07']] }, { items: [['Japan', '2024-04']] })
+      })
+      afterEach(() => vi.useRealTimers())
+
+      it('every so often, between spins: from nothing, each place as it is reached, then everything again', async () => {
+        render(<App />)
+        await act(async () => {})
+        const all = { Denmark: DEFAULT_THEME.visited, Sweden: DEFAULT_THEME.visited, Japan: DEFAULT_THEME.visited }
+        expect(painted()).toEqual(all)
+        play(SCREENSAVER_FIRST_REPLAY_MS)
+        expect(painted()).toEqual({})
+        // Each place colored as it's reached, in its turn, those of the trip it's on standing out
+        play(REPLAY_LEAD_IN * 1000)
+        expect(painted()).toEqual({ Denmark: DEFAULT_THEME.correct })
+        play(REPLAY_PAUSE * 1000)
+        expect(painted()).toEqual({ Denmark: DEFAULT_THEME.correct, Sweden: DEFAULT_THEME.correct })
+        play((REPLAY_PAUSE + REPLAY_GAP) * 1000)
+        expect(painted()).toEqual({ Denmark: DEFAULT_THEME.visited, Sweden: DEFAULT_THEME.visited, Japan: DEFAULT_THEME.correct })
+        // Then everything again, the globe turned back to the screensaver's view, spinning, until the next
+        globe.pointOfView.mockClear()
+        play(3_000)
+        expect(painted()).toEqual(all)
+        expect(globe.pointOfView).toHaveBeenCalledWith(expect.objectContaining({ lat: SCREENSAVER_VIEW.lat, altitude: SCREENSAVER_VIEW.altitude }), 2000)
+        play(SCREENSAVER_REPLAY_EVERY_MS - 1)
+        expect(painted()).toEqual(all)
+        play(1)
+        expect(painted()).toEqual({})
+      })
+
+      it('not with the switch off, nor without the flights', async () => {
+        for (const settings of [{ showScreensaverReplay: false }, { showFlights: false }]) {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+          render(<App />)
+          await act(async () => {})
+          play(SCREENSAVER_FIRST_REPLAY_MS + SCREENSAVER_REPLAY_EVERY_MS)
+          expect(painted()).not.toEqual({})
+          cleanup()
+          layer.paint.mockClear()
+        }
+      })
     })
 
     it('shows the places of your trips, and those to come, with the layers as you have them', async () => {

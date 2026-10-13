@@ -13,6 +13,7 @@ describe('useSettings', () => {
       showRegions: true,
       showCities: true,
       showFlights: true,
+      showScreensaverReplay: true,
       showFutureFlights: true,
       showFutureVisits: true,
       showDayNight: false,
