@@ -151,6 +151,17 @@ export const LayersIcon = ({ size = 24 }: Props) =>
     </>,
   )
 
+/** A banknote */
+export const MoneyIcon = ({ size = 24 }: Props) =>
+  svg(
+    size,
+    <>
+      <rect x="3" y="6.5" width="18" height="11" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6.5 9.5v.01M17.5 14.5v.01" />
+    </>,
+  )
+
 export const DownloadIcon = ({ size = 24 }: Props) =>
   svg(
     size,

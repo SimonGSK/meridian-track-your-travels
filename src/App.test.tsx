@@ -508,6 +508,29 @@ describe('App', () => {
     })
   })
 
+  describe('local time and currency', () => {
+    it("shows a country's time and what its money is worth in yours, as chosen under More, asking for the day's rates only then", async () => {
+      render(<App />)
+      await openMore('Currency')
+      expect(fetch).toHaveBeenCalled() // the card shows the rates' date
+      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Your currency' }), 'JPY')
+      click(100)
+      const fact = (term: string) => within(countryPanel()!).getByText(term, { selector: 'dt' }).nextElementSibling
+      expect(fact('Local time')).toHaveTextContent(/^\d\d:\d\d$/)
+      expect(fact('Currency')).toHaveTextContent(/^1 DKK = [\d.,]+ JPY$/)
+      expect(JSON.parse(localStorage.getItem('countries-app.currency')!)).toBe('JPY')
+    })
+
+    it("asks for nothing until a country's panel is open", async () => {
+      render(<App />)
+      await act(async () => {})
+      expect(fetch).not.toHaveBeenCalled()
+      click(100)
+      await act(async () => {})
+      expect(fetch).toHaveBeenCalled()
+    })
+  })
+
   describe("the screensaver's preview", () => {
     const openPreview = async () => {
       await openMore('Screensaver')

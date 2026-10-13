@@ -14,11 +14,12 @@ import { VISITED_REGIONS_KEY, isRegionIdList } from '../visited/useVisitedRegion
 import { VISIT_DATES_KEY, VISIT_NOTES_KEY, isVisitDates, isVisitNotes } from '../visited/useVisitDates'
 import { WISHLIST_KEY } from '../visited/useWishlist'
 import { FRIEND_KEY, isFriendOrNone } from '../visited/friend'
+import { CURRENCY_KEY, isCurrencyOrNone } from './useCurrency'
 
 /**
  * Everything is saved in this browser only, so a backup is a file with all
  * of it: places, when you went and your notes, states, cities, flights and trips, the wishlist, best scores and times, the design
- * and the layers. Restoring one replaces what's here, part by part checked
+ * and the layers, and your currency. Restoring one replaces what's here, part by part checked
  * as the app checks it when loading.
  */
 
@@ -40,6 +41,7 @@ const SAVED: { key: string; isValid: (value: unknown) => boolean }[] = [
   { key: DAILY_KEY, isValid: isDailyResults },
   { key: THEME_STORAGE_KEY, isValid: isThemeId },
   { key: SETTINGS_KEY, isValid: isSettings },
+  { key: CURRENCY_KEY, isValid: isCurrencyOrNone },
 ]
 
 /** When a backup was last downloaded here; not part of the backup */

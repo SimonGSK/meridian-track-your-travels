@@ -9,6 +9,7 @@ import CountryPanel from './CountryPanel'
 import type { CountryVisit } from './visited/CountryVisits'
 import ExplorePanel from './explore/ExplorePanel'
 import { useSettings } from './explore/useSettings'
+import { useHomeCurrency, useRates } from './settings/useCurrency'
 import GamesPanel from './games/GamesPanel'
 import { GAMES, currentRound, type Difficulty, type GameChoice, type RoundGameId } from './games/games'
 import type { Scope } from './games/allGame'
@@ -180,6 +181,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [chosenGame, setChosenGame] = useState<GameChoice | null>(null)
   /** What's opened in the More tab, kept while the screensaver is previewed from it */
   const [moreOpen, setMoreOpen] = useState<MoreId | null>(compareOnOpen ? 'compare' : null)
+  // The rates to convert with; the day's are fetched (once a day) only while a country's panel or the currency card is open
+  const rates = useRates(!!selected || (view === 'more' && moreOpen === 'currency'))
   // Places marked visited, by hand
   const { visited: marked, add: addVisited, remove: removeVisited } = useVisited()
   const {
@@ -280,6 +283,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const { width, height } = useWindowSize()
   const [theme, setTheme] = useTheme()
   const [settings, changeSettings] = useSettings()
+  // Your currency, and the rates, for a country's panel to say what its money is worth in it
+  const homeCurrency = useHomeCurrency()
   const regions = useRegions()
   const { visitedRegions, toggle: toggleRegionId, add: addRegionId } = useVisitedRegions()
   const [hoveredRegion, setHoveredRegion] = useState<RegionFeature | null>(null)
@@ -1341,6 +1346,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   />
                 }
                 onPreview={startPreview}
+                currency={{ chosen: homeCurrency.chosen, guess: homeCurrency.guess, onChoose: homeCurrency.choose, rates }}
               />
             </>
           )}
@@ -1401,6 +1407,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       {selected && (
         <CountryPanel
           country={selected}
+          money={{ currency: homeCurrency.currency, rates }}
           visited={visited.has(selected.properties.name)}
           onToggleVisited={() =>
             (visited.has(selected.properties.name) ? removePlace : addPlace)(selected.properties.name)
