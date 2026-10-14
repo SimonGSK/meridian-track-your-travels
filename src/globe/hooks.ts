@@ -414,12 +414,19 @@ export function useImagery(imagery: Theme['imagery']) {
 /** The airports, once loaded */
 export const useAirports = (): Airport[] | null => useLoaded(loadAirports)
 
-/** Flights as arcs, with a plane flying each of `journeys` (a trip), in `color`, those picked in `highlight` */
+/** The planes' clock, in seconds: the real one, unless a replay has its own */
+const realClock = () => performance.now() / 1000
+
+/**
+ * Flights as arcs, with a plane flying each of `journeys` (a trip), in `color`, those picked in `highlight`, on the
+ * planes' `clock`
+ */
 export function useFlightLayer(
   globe: GlobeMethods | null,
   lines: readonly FlightLine[],
   journeys: readonly FlightJourney[],
   { color, highlight }: { color: string; highlight: string },
+  clock: () => number = realClock,
 ) {
   const layer = useRef<FlightLayer | null>(null)
 
@@ -448,12 +455,12 @@ export function useFlightLayer(
     const canvas = globe.renderer().domElement
     let frame = 0
     const fly = () => {
-      layer.current?.tick(performance.now() / 1000, camera, canvas.clientWidth, canvas.clientHeight)
+      layer.current?.tick(clock(), camera, canvas.clientWidth, canvas.clientHeight)
       frame = requestAnimationFrame(fly)
     }
     fly()
     return () => cancelAnimationFrame(frame)
-  }, [globe, lines, journeys])
+  }, [globe, lines, journeys, clock])
 }
 
 /** Places you're going to, outlined in dashes of `color`; or other areas, in a layer of another `name` */

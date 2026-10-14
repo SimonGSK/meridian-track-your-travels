@@ -1783,7 +1783,7 @@ code {
   pointer-events: none;
 }
 
-/* While following a trip: which flight, and Stop */
+/* While replaying trips: which, when, and pause, faster and Stop */
 .follow-bar {
   pointer-events: auto;
   display: flex;
@@ -1807,6 +1807,23 @@ code {
 
 .follow-count {
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.replay-bar {
+  gap: 4px;
+}
+
+.replay-bar .follow-text {
+  margin-right: 6px;
+}
+
+/* The speed, "2×", going faster when pressed; in line with the buttons beside it, as text buttons sit at the top */
+.replay-bar .replay-speed {
+  align-self: center;
+  min-width: 34px;
+  padding: 4px 6px;
   font-family: var(--font-mono);
   font-size: 12px;
 }

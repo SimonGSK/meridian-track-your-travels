@@ -4,6 +4,7 @@ import { cityOf, type Airport } from '../data/airports'
 import { flightStats, formatDistance, type Route } from '../data/flights'
 import { countdown, isToCome } from '../data/plans'
 import { countriesOfTrip, itemKey, placeFor, titleOf, type TripItem, type TripView, type Visit } from '../data/savedTrips'
+import { replayOfTrip } from '../data/replay'
 import { formatVisitDate, partsOf, type VisitDate } from '../data/visitDates'
 import { CloseIcon, GripIcon, PencilIcon, PlaneIcon, PlayIcon, PlusIcon } from '../icons'
 import StatsBox from '../ui/StatsBox'
@@ -54,8 +55,8 @@ type Props = {
   onShowTrip: (trip: TripView) => void
   onShowRoute: (route: Route) => void
   onShowPlace: (country: CountryFeature) => void
-  /** Follows a trip on the globe, flight by flight */
-  onFollowTrip?: (routes: Route[]) => void
+  /** Replays one trip on the globe, by its id: its flights flown, each place colored as it's reached */
+  onReplayTrip?: (id: string) => void
   /** Replays every trip been on, from the first, on the globe */
   onReplay?: () => void
 }
@@ -78,7 +79,7 @@ function whenOf(date: VisitDate | null, end: VisitDate | null) {
  * a name; below them, what's in no trip yet, ready to date or put in one.
  */
 export default function TripsPanel(props: Props) {
-  const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onFollowTrip, onReplay } = props
+  const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onReplayTrip, onReplay } = props
   const [naming, setNaming] = useState<string | null>(null)
   const [making, setMaking] = useState(false)
   const { flights, km, aroundEarth } = flightStats(flown)
@@ -153,7 +154,7 @@ export default function TripsPanel(props: Props) {
               onShow={() => onShowTrip(view)}
               onShowRoute={onShowRoute}
               onShowPlace={onShowPlace}
-              onFollow={onFollowTrip && view.routes.length > 0 ? () => onFollowTrip(view.routes) : undefined}
+              onReplay={onReplayTrip && replayOfTrip(view).steps.length > 0 ? () => onReplayTrip(view.trip.id) : undefined}
             />
           ))}
         </ul>
@@ -260,11 +261,12 @@ type CardProps = {
   onShow: () => void
   onShowRoute: (route: Route) => void
   onShowPlace: (country: CountryFeature) => void
-  onFollow?: () => void
+  /** Replays it on the globe, if there's anything of it been yet */
+  onReplay?: () => void
 }
 
 /** A trip: its name and when, and opened, its places and flights in order, to rearrange, date and add to */
-function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onFollow }: CardProps) {
+function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onReplay }: CardProps) {
   const { trip, items, date, endDate } = view
   const [adding, setAdding] = useState<'place' | 'flight' | null>(null)
   const title = titleOf(view)
@@ -309,13 +311,13 @@ function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, o
           </span>
           {trip.note && !naming && <span className="visit-note">{trip.note}</span>}
         </button>
-        {onFollow && (
+        {onReplay && (
           <button
             type="button"
             className="remove-button note-button"
-            onClick={onFollow}
-            aria-label={`Follow the trip ${title}`}
-            title="Follow it on the globe, flight by flight"
+            onClick={onReplay}
+            aria-label={`Replay the trip ${title}`}
+            title="Replay it on the globe, flight by flight"
           >
             <PlayIcon size={14} />
           </button>

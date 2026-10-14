@@ -1537,35 +1537,34 @@ describe('App', () => {
       await waitFor(() => expect(planes()).toEqual(['CPH-DXB DXB-BKK BKK-CPH', 'LHR-CDG']))
     })
 
-    it('follows a trip on the globe, flight by flight, then shows it whole', async () => {
+    it('replays one trip from its card, flight by flight, drawing each, then shows it whole', async () => {
       withFlights(fly('CPH', 'DXB'), fly('DXB', 'BKK'), fly('BKK', 'CPH'), fly('LHR', 'CDG'))
       render(<App />)
       await openFlights()
-      const follow = await screen.findByRole('button', { name: /^Follow the trip United Arab Emirates → Thailand/ })
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const replay = await screen.findByRole('button', { name: /^Replay the trip United Arab Emirates → Thailand/ })
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
       try {
-        const bar = () => screen.queryByRole('status', { name: 'Following a trip' })
+        const bar = () => screen.queryByRole('status', { name: 'Replaying a trip' })
         const planes = () => (flightLayer.show.mock.calls.at(-1)?.[1] ?? []) as { key: string; timing?: object }[]
-        fireEvent.click(follow)
-        expect(bar()).toHaveTextContent('Copenhagen → Dubai1 of 3')
-        // Just the trip, its plane flying it once, the first flight standing out
-        expect(drawn()).toEqual(['CPH-DXB!', 'DXB-BKK', 'BKK-CPH'])
-        expect(planes()).toEqual([expect.objectContaining({ key: 'following', timing: expect.any(Object) })])
-
-        act(() => vi.advanceTimersByTime(6_000)) // landed in Dubai, and straight on
-        expect(bar()).toHaveTextContent('Dubai → Bangkok2 of 3')
-        expect(drawn()).toEqual(['CPH-DXB', 'DXB-BKK!', 'BKK-CPH'])
+        fireEvent.click(replay)
+        expect(bar()).toHaveTextContent('The trip, from the start')
+        act(() => vi.advanceTimersByTime(REPLAY_LEAD_IN * 1000 + 50))
+        // Just the trip, the flight being flown, its plane flying it once and drawing it
+        expect(bar()).toHaveTextContent('Copenhagen → Dubai')
+        expect(drawn()).toEqual(['CPH-DXB!'])
+        expect(planes()).toEqual([expect.objectContaining({ timing: expect.any(Object) })])
+        expect(flightLayer.show.mock.lastCall![0][0]).toMatchObject({ drawn: { startsAt: REPLAY_LEAD_IN } })
 
         act(() => vi.advanceTimersByTime(60_000)) // home, and a moment after
         expect(bar()).not.toBeInTheDocument()
         expect(drawn()).toEqual(['CPH-DXB!', 'DXB-BKK!', 'BKK-CPH!', 'LHR-CDG']) // all flights again, the trip picked
 
         // Stopped early with Escape, or Stop
-        fireEvent.click(follow)
+        fireEvent.click(replay)
         expect(bar()).toBeInTheDocument()
         fireEvent.keyDown(window, { key: 'Escape' })
         expect(bar()).not.toBeInTheDocument()
-        fireEvent.click(follow)
+        fireEvent.click(replay)
         fireEvent.click(within(bar()!).getByRole('button', { name: 'Stop' }))
         expect(bar()).not.toBeInTheDocument()
       } finally {
@@ -1606,6 +1605,41 @@ describe('App', () => {
       }
     })
 
+    it('pauses a replay where it is, plays on, and goes faster, the next one too', async () => {
+      withTrips({ name: 'Japan', items: [['Japan', '2024-04']] }, { name: 'Nordics', items: [['Sweden', '2018-07'], ['Norway', '2018-07']] })
+      render(<App />)
+      await openFlights()
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+      try {
+        const { correct, visited } = DEFAULT_THEME
+        const bar = () => within(screen.getByRole('status', { name: 'Replaying your trips' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+        act(() => vi.advanceTimersByTime(REPLAY_LEAD_IN * 1000 + 50))
+        expect(painted()).toEqual({ Sweden: correct })
+        // Paused: nothing more, however long
+        fireEvent.click(bar().getByRole('button', { name: 'Pause' }))
+        act(() => vi.advanceTimersByTime(10_000))
+        expect(painted()).toEqual({ Sweden: correct })
+        // On from where it was
+        fireEvent.click(bar().getByRole('button', { name: 'Play on' }))
+        act(() => vi.advanceTimersByTime(REPLAY_PAUSE * 1000))
+        expect(painted()).toEqual({ Sweden: correct, Norway: correct })
+        // Twice as fast: the next trip in half the time
+        fireEvent.click(bar().getByRole('button', { name: 'Speed 1×' }))
+        expect(bar().getByRole('button', { name: 'Speed 2×' })).toBeInTheDocument()
+        act(() => vi.advanceTimersByTime(((REPLAY_PAUSE + REPLAY_GAP) * 1000) / 2 + 50))
+        expect(painted()).toEqual({ Sweden: visited, Norway: visited, Japan: correct })
+        // And the next replay as fast; faster again, then round to the first
+        fireEvent.click(bar().getByRole('button', { name: 'Stop' }))
+        fireEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+        fireEvent.click(bar().getByRole('button', { name: 'Speed 2×' }))
+        fireEvent.click(bar().getByRole('button', { name: 'Speed 4×' }))
+        expect(bar().getByRole('button', { name: 'Speed 1×' })).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('draws each flight replayed behind its plane, as a trail, there and back once', async () => {
       localStorage.setItem(
         'countries-app.flights',
@@ -1636,16 +1670,16 @@ describe('App', () => {
       }
     })
 
-    it('on a phone, puts the flights away while following a trip, and brings them back at the end', async () => {
+    it('on a phone, puts the trips away while replaying one, and brings them back at the end', async () => {
       const matchMedia = window.matchMedia
       window.matchMedia = ((query: string) => ({ matches: query.includes('max-width: 640px'), media: query })) as typeof window.matchMedia
       withFlights(fly('CPH', 'DXB'), fly('DXB', 'CPH'))
       try {
         render(<App />)
         await openFlights()
-        const follow = await screen.findByRole('button', { name: /^Follow the trip/ })
+        const replay = await screen.findByRole('button', { name: /^Replay the trip/ })
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-        fireEvent.click(follow)
+        fireEvent.click(replay)
         expect(sidePanel()).toHaveAccessibleName('Explore') // the sheet made way
         act(() => vi.advanceTimersByTime(60_000))
         expect(sidePanel()).toHaveAccessibleName('Visited')

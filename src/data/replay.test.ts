@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { Airport } from './airports'
 import type { Route } from './flights'
-import { REPLAY_GAP, REPLAY_LEAD_IN, REPLAY_PAUSE, replayOf, replaySeconds, replayedBy } from './replay'
+import {
+  REPLAY_GAP,
+  REPLAY_LEAD_IN,
+  REPLAY_PAUSE,
+  replayOf,
+  replayOfTrip,
+  replaySeconds,
+  replayTime,
+  replayedBy,
+  resetClock,
+  startClock,
+} from './replay'
 import { tripViewsOf, type SavedTrip, type TripItem } from './savedTrips'
 import type { VisitDate } from './visitDates'
 
@@ -58,3 +69,29 @@ describe('replayOf', () => {
     expect(inJapan.trip).toBe(1)
   })
 })
+
+describe('one trip', () => {
+  it('replays a trip of its own, with a date or none, but nothing still to come', () => {
+    const views = tripViewsOf(trips, ROUTES)
+    const one = (id: string) => replayOfTrip(views.find((view) => view.trip.id === id)!, NOW)
+    expect(one('japan').steps.map((step) => step.kind)).toEqual(['flight', 'visit', 'flight'])
+    expect(one('japan').steps[0].at).toBe(REPLAY_LEAD_IN)
+    expect(one('someday').steps).toEqual([expect.objectContaining({ kind: 'visit', place: 'Peru' })])
+    expect(one('to-come').steps).toEqual([])
+  })
+})
+
+describe('the replay clock', () => {
+  it('goes from the start at its speed, standing still while paused, and on from where it was', () => {
+    let clock = startClock(100)
+    expect(replayTime(clock, 103)).toBe(3)
+    clock = resetClock(clock, 103, { speed: 4 })
+    expect(replayTime(clock, 104)).toBe(7) // four seconds in one
+    clock = resetClock(clock, 104, { paused: true })
+    expect(replayTime(clock, 200)).toBe(7) // paused
+    clock = resetClock(clock, 200, { paused: false })
+    expect(replayTime(clock, 201)).toBe(11) // on, still four times as fast
+    expect(startClock(0, 2).speed).toBe(2)
+  })
+})
+

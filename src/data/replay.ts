@@ -30,11 +30,12 @@ export const replaySeconds = ({ from, to }: { from: { lat: number; lng: number }
 
 /**
  * The trips been on, oldest first, each step in its order: a trip without a
- * date has no place in time, and one to come hasn't happened, nor have the
+ * date has no place in time (unless it's `undated` you want, one trip
+ * replayed from its card), and one to come hasn't happened, nor have the
  * flights and visits in a month still to come.
  */
-export function replayOf(views: readonly TripView[], now = new Date()) {
-  const been = views.filter((view) => view.date && !isToCome(view.date, now)).reverse()
+export function replayOf(views: readonly TripView[], now = new Date(), { undated = false } = {}) {
+  const been = views.filter((view) => (view.date ? !isToCome(view.date, now) : undated)).reverse()
   const steps: ReplayStep[] = []
   let at = REPLAY_LEAD_IN
   been.forEach((view, trip) => {
@@ -56,6 +57,34 @@ export function replayOf(views: readonly TripView[], now = new Date()) {
   })
   return { trips: been, steps, seconds: at }
 }
+
+/** One trip, replayed from its card: dated or not */
+export const replayOfTrip = (view: TripView, now = new Date()) => replayOf([view], now, { undated: true })
+
+/** How fast a replay can go */
+export const REPLAY_SPEEDS = [1, 2, 4] as const
+export type ReplaySpeed = (typeof REPLAY_SPEEDS)[number]
+
+/**
+ * A replay's own clock, in seconds of the replay: `at` when it was last set
+ * going (or paused), `since` then on the real clock, going `speed` times as
+ * fast, or standing still while paused
+ */
+export type ReplayClock = { at: number; since: number; speed: ReplaySpeed; paused: boolean }
+
+/** A clock from the start, going at `speed` */
+export const startClock = (now: number, speed: ReplaySpeed = 1): ReplayClock => ({ at: 0, since: now, speed, paused: false })
+
+/** Where in the replay it is at a moment on the real clock */
+export const replayTime = ({ at, since, speed, paused }: ReplayClock, now: number) => (paused ? at : at + (now - since) * speed)
+
+/** The clock going on from where it is now, at another speed, or paused or not */
+export const resetClock = (clock: ReplayClock, now: number, changes: Partial<Pick<ReplayClock, 'speed' | 'paused'>>): ReplayClock => ({
+  ...clock,
+  ...changes,
+  at: replayTime(clock, now),
+  since: now,
+})
 
 /** How the replay stands after a step: the places reached so far, those of the trip it's on, and the flights flown */
 export function replayedBy(steps: readonly ReplayStep[], upTo: number) {
