@@ -1500,6 +1500,26 @@ code {
   min-width: 0;
 }
 
+/* A trip being made: its name written where it shows */
+.trip-name-input {
+  flex: 1;
+  min-width: 0;
+  margin: 4px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(3, 10, 18, 0.45);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.trip-name-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .trip-top .note-button {
   flex: none;
   margin-top: 6px;
@@ -1716,15 +1736,13 @@ code {
   font-weight: 500;
 }
 
-/* Making a trip, and adding a place or a flight to one */
-.trip-new,
+/* Adding a place or a flight to a trip */
 .trip-add {
   display: grid;
   gap: 8px;
   margin: 10px 0 4px;
 }
 
-.trip-new input,
 .trip-add input[type='search'] {
   width: 100%;
   padding: 9px 12px;

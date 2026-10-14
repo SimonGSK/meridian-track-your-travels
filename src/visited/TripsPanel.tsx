@@ -81,7 +81,6 @@ function whenOf(date: VisitDate | null, end: VisitDate | null) {
 export default function TripsPanel(props: Props) {
   const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onReplayTrip, onReplay } = props
   const [naming, setNaming] = useState<string | null>(null)
-  const [making, setMaking] = useState(false)
   const { flights, km, aroundEarth } = flightStats(flown)
   const looseCount = loose.places.length + loose.flights.length
 
@@ -90,15 +89,27 @@ export default function TripsPanel(props: Props) {
     if (open) document.querySelector(`[data-trip="${CSS.escape(open)}"]`)?.scrollIntoView?.({ block: 'nearest' })
   }, [open])
 
-  /** A new trip, opened, with what's to go in it; named straight away */
-  const make = (name: string, items: TripItem[] = []) => {
-    const id = actions.create(name, items)
+  /** A new trip, with what's to go in it, opened at the top of the list, to add to straight away; named when you like */
+  const make = (items: TripItem[] = []) => onOpen(actions.create('', items))
+  /** Nothing in it, no name or note: a trip just made, and left as it was */
+  const isBlank = (id: string) => {
+    const view = trips.find((t) => t.trip.id === id)
+    return !!view && view.items.length === 0 && !view.trip.name.trim() && !view.trip.note?.trim()
+  }
+  /** Opens a trip, or closes the one open; a blank one closed is gone, rather than left in the list */
+  const openTrip = (id: string | null) => {
+    if (open && open !== id && isBlank(open)) actions.remove(open)
     onOpen(id)
-    if (!name) setNaming(id)
+  }
+  /** "New trip": the one made and still blank, if there is one, or a new one */
+  const newTrip = () => {
+    const blank = trips.find((view) => isBlank(view.trip.id))
+    if (blank) onOpen(blank.trip.id)
+    else make()
   }
   /** Puts something in no trip into one, where it fits there */
   const putIn = (id: string, item: TripItem) => {
-    if (id === 'new') return make('', [item])
+    if (id === 'new') return make([item])
     const view = trips.find((t) => t.trip.id === id)
     if (view) actions.add(id, item, placeFor(item, view.items, routes))
   }
@@ -113,26 +124,16 @@ export default function TripsPanel(props: Props) {
           { label: 'Distance', value: formatDistance(km), title: `${oneDecimal.format(aroundEarth)}× around the Earth, at 40,075 km` },
         ]}
       />
-      {making ? (
-        <NewTrip
-          onMake={(name) => {
-            setMaking(false)
-            make(name)
-          }}
-          onCancel={() => setMaking(false)}
-        />
-      ) : (
-        <div className="card-actions">
-          <button type="button" className="primary-button" onClick={() => setMaking(true)}>
-            <PlusIcon size={14} /> New trip
+      <div className="card-actions">
+        <button type="button" className="primary-button" onClick={newTrip}>
+          <PlusIcon size={14} /> New trip
+        </button>
+        {onReplay && (
+          <button type="button" className="link-button replay-trips" onClick={onReplay}>
+            <PlayIcon size={13} /> Replay your trips
           </button>
-          {onReplay && (
-            <button type="button" className="link-button replay-trips" onClick={onReplay}>
-              <PlayIcon size={13} /> Replay your trips
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {trips.length === 0 ? (
         <p className="muted">
@@ -148,7 +149,7 @@ export default function TripsPanel(props: Props) {
               airports={airports}
               actions={actions}
               isOpen={open === view.trip.id}
-              onToggle={() => onOpen(open === view.trip.id ? null : view.trip.id)}
+              onToggle={() => openTrip(open === view.trip.id ? null : view.trip.id)}
               naming={naming === view.trip.id}
               onNaming={(on) => setNaming(on ? view.trip.id : null)}
               onShow={() => onShowTrip(view)}
@@ -190,40 +191,6 @@ export default function TripsPanel(props: Props) {
         </ul>
       )}
     </div>
-  )
-}
-
-/** Naming a new trip */
-function NewTrip({ onMake, onCancel }: { onMake: (name: string) => void; onCancel: () => void }) {
-  const [name, setName] = useState('')
-  return (
-    <form
-      className="trip-new"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onMake(name.trim())
-      }}
-    >
-      <input
-        {...noAutofill('trip-name')}
-        type="text"
-        aria-label="Name of the new trip"
-        placeholder="Name it, like Summer in Japan"
-        maxLength={TRIP_NAME_MAX}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        // Opened by pressing New trip, to write in straight away
-        autoFocus
-      />
-      <div className="card-actions">
-        <button type="submit" className="primary-button">
-          Make the trip
-        </button>
-        <button type="button" className="link-button" onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </form>
   )
 }
 
@@ -289,28 +256,44 @@ function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, o
     actions.move(trip.id, items, from, to)
   })
 
+  // Open with nothing in it yet, as one just made is: its name to write where it shows, rather than a way to close it
+  const beingMade = isOpen && items.length === 0
+
   return (
     <li className={`trip${isOpen ? ' open' : ''}`} data-trip={trip.id}>
       <div className="trip-top">
-        <button type="button" className="trip-header" aria-expanded={isOpen} onClick={onToggle}>
-          {meta && <span className="trip-meta">{meta}</span>}
-          <span className="trip-title">
-            {named && <span className="trip-name">{trip.name}</span>}
-            {flags.length > 0 && (
-              <span className="trip-flags">
-                {/* Apart when read out; the space takes no room between them */}
-                {flags.map((country, i) => (
-                  <Fragment key={country.properties.name}>
-                    {i > 0 && ' '}
-                    <Flag country={country} named />
-                  </Fragment>
-                ))}
-              </span>
-            )}
-            {!named && flags.length === 0 && <span className="trip-name muted">Nothing in it yet</span>}
-          </span>
-          {trip.note && !naming && <span className="visit-note">{trip.note}</span>}
-        </button>
+        {beingMade ? (
+          <input
+            {...noAutofill('trip-name')}
+            className="trip-name-input"
+            type="text"
+            aria-label="Name of the trip"
+            placeholder="Name it, if you like"
+            maxLength={TRIP_NAME_MAX}
+            value={trip.name}
+            onChange={(e) => actions.rename(trip.id, { name: e.target.value, note: trip.note })}
+          />
+        ) : (
+          <button type="button" className="trip-header" aria-expanded={isOpen} onClick={onToggle}>
+            {meta && <span className="trip-meta">{meta}</span>}
+            <span className="trip-title">
+              {named && <span className="trip-name">{trip.name}</span>}
+              {flags.length > 0 && (
+                <span className="trip-flags">
+                  {/* Apart when read out; the space takes no room between them */}
+                  {flags.map((country, i) => (
+                    <Fragment key={country.properties.name}>
+                      {i > 0 && ' '}
+                      <Flag country={country} named />
+                    </Fragment>
+                  ))}
+                </span>
+              )}
+              {!named && flags.length === 0 && <span className="trip-name muted">Nothing in it yet</span>}
+            </span>
+            {trip.note && !naming && <span className="visit-note">{trip.note}</span>}
+          </button>
+        )}
         {onReplay && (
           <button
             type="button"
@@ -322,15 +305,17 @@ function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, o
             <PlayIcon size={14} />
           </button>
         )}
-        <button
-          type="button"
-          className="remove-button note-button"
-          aria-expanded={naming}
-          onClick={() => onNaming(!naming)}
-          aria-label={trip.name.trim() ? `Rename the trip ${title}` : `Name the trip ${title}`}
-        >
-          <PencilIcon size={14} />
-        </button>
+        {!beingMade && (
+          <button
+            type="button"
+            className="remove-button note-button"
+            aria-expanded={naming}
+            onClick={() => onNaming(!naming)}
+            aria-label={trip.name.trim() ? `Rename the trip ${title}` : `Name the trip ${title}`}
+          >
+            <PencilIcon size={14} />
+          </button>
+        )}
       </div>
       {naming && (
         <form
