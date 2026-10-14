@@ -54,10 +54,20 @@ import GlobeKey from './ui/GlobeKey'
 import { useNewAchievements } from './visited/useNewAchievements'
 import { describeVisits, newestFirst, type VisitDate } from './data/visitDates'
 import { cityOf, countryOf } from './data/airports'
-import { FOLLOW_LEAD_IN, FOLLOW_STOP, followLandings, followSeconds } from './globe/follow'
-import FollowBar from './ui/FollowBar'
 import ReplayBar from './ui/ReplayBar'
-import { SCREENSAVER_FIRST_REPLAY_MS, SCREENSAVER_REPLAY_EVERY_MS, replayOf, replayedBy } from './data/replay'
+import {
+  REPLAY_SPEEDS,
+  SCREENSAVER_FIRST_REPLAY_MS,
+  SCREENSAVER_REPLAY_EVERY_MS,
+  replayOf,
+  replayOfTrip,
+  replayTime,
+  replayedBy,
+  resetClock,
+  startClock,
+  type ReplayClock,
+  type ReplaySpeed,
+} from './data/replay'
 import UndoToast from './ui/UndoToast'
 import UpdateToast from './pwa/UpdateToast'
 import { useUpdateReady } from './pwa/useUpdateReady'
@@ -145,8 +155,9 @@ const spotsOfPlaces = (names: readonly string[]): Spot[] =>
 /** How much the land's height shows in a picture of the Earth */
 const RELIEF = 40
 const NO_FLIGHTS = { lines: [], journeys: [] }
-/** How long the last landing shows before the whole trip, and the panel, come back */
-const FOLLOW_END = 1.5
+
+/** Trips replayed: all, or one (from its card), on the replay's own clock, and whether the panel made way for it */
+type Replaying = ReturnType<typeof replayOf> & { clock: ReplayClock; reopen: boolean; one: boolean }
 
 
 /** Phones show one panel at a time, as a sheet over the globe */
@@ -521,89 +532,83 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // A year wrapped: its card full screen, to keep or share
   const [wrapping, setWrapping] = useState(false)
 
-  // Following a trip: its plane flies its flights once, from when it starts (on the planes' clock), and the globe turns
-  // to each flight in turn. On phones the panel makes way for it, and comes back at the end (`reopen`)
-  const [following, setFollowing] = useState<{ legs: Route[]; startedAt: number; reopen: boolean } | null>(null)
-  /** The flight being followed */
-  const [followLeg, setFollowLeg] = useState(0)
-  const followTrip = useCallback(
-    (legs: Route[]) => {
-      selectCountry(null)
-      setShownRoutes(legs)
-      setFollowLeg(0)
-      setFollowing({ legs, startedAt: performance.now() / 1000, reopen: isPhone() })
-      if (isPhone()) setView('explore')
-    },
-    [selectCountry],
-  )
-  /** At the end of the trip, or with Stop: the Trips list again, if it made way */
-  const finishFollowing = useCallback(() => {
-    if (following?.reopen) setView('visited')
-    setFollowing(null)
-  }, [following])
-  useEffect(() => {
-    if (!following) return
-    const { legs } = following
-    flyToSee(spotsOfRoute(legs[0]))
-    // As each flight lands, the globe turns to the next as the plane flies on, and at the end to the whole trip
-    const landings = followLandings(legs.map(followSeconds))
-    const timers = landings.map((lands, i) =>
-      setTimeout(() => {
-        if (i + 1 < legs.length) {
-          setFollowLeg(i + 1)
-          flyToSee(spotsOfRoute(legs[i + 1]))
-        } else {
-          flyToSee(legs.flatMap(spotsOfRoute))
-        }
-      }, lands * 1000),
-    )
-    const done = setTimeout(finishFollowing, (landings.at(-1)! + FOLLOW_END) * 1000)
-    return () => {
-      timers.forEach(clearTimeout)
-      clearTimeout(done)
-    }
-  }, [following, flyToSee, finishFollowing])
-
-  // Replaying your trips, from the Trips list: every trip been on, oldest first, its flights flown and its places colored
-  // as they're reached, staying colored. On phones the panel makes way, and comes back at the end (`reopen`)
-  const [replay, setReplay] = useState<(ReturnType<typeof replayOf> & { startedAt: number; reopen: boolean }) | null>(null)
+  // Replaying trips: every trip been on, oldest first (from the Trips list), or one (from its card), its flights flown,
+  // each drawn behind its plane, and its places colored as they're reached, staying colored. It runs on its own clock,
+  // to pause and go faster. On phones the panel makes way, and comes back at the end (`reopen`)
+  const [replay, setReplay] = useState<Replaying | null>(null)
   /** The step of the replay begun last */
   const [replayAt, setReplayAt] = useState(-1)
+  /** The speed chosen last, for the next replay too */
+  const [replaySpeed, setReplaySpeed] = useState<ReplaySpeed>(1)
   const canReplay = useMemo(() => replayOf(tripViews).steps.length > 0, [tripViews])
   const playReplay = useCallback(
-    (reopen: boolean) => {
+    (played: ReturnType<typeof replayOf>, { reopen = false, one = false } = {}) => {
       setReplayAt(-1)
-      setReplay({ ...replayOf(tripViews), startedAt: performance.now() / 1000, reopen })
+      setReplay({ ...played, clock: startClock(performance.now() / 1000, replaySpeed), reopen, one })
     },
-    [tripViews],
+    [replaySpeed],
   )
   const startReplay = () => {
     selectCountry(null)
     setShownRoutes(null)
-    setFollowing(null)
-    playReplay(isPhone())
+    playReplay(replayOf(tripViews), { reopen: isPhone() })
     if (isPhone()) setView('explore')
+  }
+  /** One trip, from its card: picked on the globe at the end */
+  const replayTrip = (id: string) => {
+    const view = tripViews.find((v) => v.trip.id === id)
+    if (!view) return
+    selectCountry(null)
+    setShownRoutes(view.routes.length > 0 ? view.routes : null)
+    playReplay(replayOfTrip(view), { reopen: isPhone(), one: true })
+    if (isPhone()) setView('explore')
+  }
+  const pauseReplay = () =>
+    setReplay((r) => r && { ...r, clock: resetClock(r.clock, performance.now() / 1000, { paused: !r.clock.paused }) })
+  /** The next speed, round from the fastest to the first */
+  const speedUpReplay = () => {
+    if (!replay) return
+    const speed = REPLAY_SPEEDS[(REPLAY_SPEEDS.indexOf(replay.clock.speed) + 1) % REPLAY_SPEEDS.length]
+    setReplaySpeed(speed)
+    setReplay((r) => r && { ...r, clock: resetClock(r.clock, performance.now() / 1000, { speed }) })
   }
   const finishReplay = useCallback(() => {
     if (replay?.reopen) setView('visited')
     setReplay(null)
   }, [replay])
   useEffect(() => {
-    if (!replay) return
-    const timers = replay.steps.map((step, i) =>
-      setTimeout(() => {
-        setReplayAt(i)
-        // The globe turns to each flight, and to each place not just landed in
-        const before = replay.steps[i - 1]
-        if (step.kind === 'flight') flyToSee(spotsOfRoute(step.route))
-        else if (before?.kind !== 'flight' || countryOf(before.route.to) !== step.place) flyToSee(spotsOfPlaces([step.place]))
-      }, step.at * 1000),
+    if (!replay || replay.clock.paused) return
+    const { clock, steps } = replay
+    // From where it is on its clock: each step still to come, sooner the faster it goes
+    const at = replayTime(clock, performance.now() / 1000)
+    const after = (time: number) => (Math.max(time - at, 0) / clock.speed) * 1000
+    const timers = steps.flatMap((step, i) =>
+      step.at < at
+        ? []
+        : [
+            setTimeout(() => {
+              setReplayAt(i)
+              // The globe turns to each flight, and to each place not just landed in
+              const before = steps[i - 1]
+              if (step.kind === 'flight') flyToSee(spotsOfRoute(step.route))
+              else if (before?.kind !== 'flight' || countryOf(before.route.to) !== step.place) flyToSee(spotsOfPlaces([step.place]))
+            }, after(step.at)),
+          ],
     )
     // A moment on the last, then everything again
-    timers.push(setTimeout(finishReplay, (replay.seconds + 1.5) * 1000))
+    timers.push(setTimeout(finishReplay, after(replay.seconds + 1.5)))
     return () => timers.forEach(clearTimeout)
   }, [replay, flyToSee, finishReplay])
+  /** The planes' clock while replaying: the replay's own, paused and faster with it */
+  const replayClock = useMemo(() => (replay ? () => replayTime(replay.clock, performance.now() / 1000) : undefined), [replay])
   const replayed = useMemo(() => (replay ? replayedBy(replay.steps, replayAt) : null), [replay, replayAt])
+  // Replaying one trip, where it's got to: the flight being flown, or the place reached
+  const replayStep = replay && replayAt >= 0 ? replay.steps[replayAt] : null
+  const replayStepLabel = replayStep
+    ? replayStep.kind === 'flight'
+      ? `${cityOf(replayStep.route.from)} → ${cityOf(replayStep.route.to)}`
+      : replayStep.place
+    : null
   // As a screensaver (or its preview), your trips replayed every so often, between spins, if switched on with the
   // flights: first soon, then after a good while of spinning, the globe turned back to the screensaver's view
   const replaysAsScreensaver =
@@ -616,12 +621,12 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     const timer = setTimeout(
       () => {
         replayedAsScreensaver.current = true
-        playReplay(false)
+        playReplay(replayOf(tripViews))
       },
       again ? SCREENSAVER_REPLAY_EVERY_MS : SCREENSAVER_FIRST_REPLAY_MS,
     )
     return () => clearTimeout(timer)
-  }, [replaysAsScreensaver, replay, globe, playReplay])
+  }, [replaysAsScreensaver, replay, globe, playReplay, tripViews])
 
   // A selected country with states isn't raised: it stays flat so its states can be picked on the globe
   const editing = !playing && selected && hasRegions(selected) ? selected : null
@@ -875,35 +880,15 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             from: route.from,
             to: route.to,
             highlighted: replayed.flights.some((step) => step.trip === replayed.trip && uniqueRoutes([route, step.route]).length === 1),
-            drawn: { startsAt: replay.startedAt + first.at, seconds: first.seconds },
+            drawn: { startsAt: first.at, seconds: first.seconds },
           }
         }),
         journeys: replayed.flights.map((step) => ({
           key: `replay-${step.at}`,
           legs: [step.route],
           highlighted: true,
-          timing: { startsAt: replay.startedAt + step.at, seconds: [step.seconds], stop: 0 },
+          timing: { startsAt: step.at, seconds: [step.seconds], stop: 0 },
         })),
-      }
-    }
-    // Following a trip: just it, the flight being flown standing out, and its plane flying it once
-    if (following) {
-      const { legs, startedAt } = following
-      return {
-        lines: uniqueRoutes(legs).map((route) => ({
-          key: route.flight.id,
-          from: route.from,
-          to: route.to,
-          highlighted: uniqueRoutes([route, legs[followLeg]]).length === 1,
-        })),
-        journeys: [
-          {
-            key: 'following',
-            legs,
-            highlighted: true,
-            timing: { startsAt: startedAt + FOLLOW_LEAD_IN, seconds: legs.map(followSeconds), stop: FOLLOW_STOP },
-          },
-        ],
       }
     }
     // The flights taken, and those booked, each if switched on (a year shows its flights all the same)
@@ -946,8 +931,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
   }, [
     cityAnswer,
-    following,
-    followLeg,
     routes,
     upcomingRoutes,
     lapseStep,
@@ -961,7 +944,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     replay,
     replayed,
   ])
-  useFlightLayer(globe, flightsShown.lines, flightsShown.journeys, { color: theme.flight, highlight: theme.selected })
+  useFlightLayer(globe, flightsShown.lines, flightsShown.journeys, { color: theme.flight, highlight: theme.selected }, replayClock)
   const cityAt = useCallback(
     (point: Point | null) => (globe && point && pinned.length > 0 ? (pinAt(globe, pinned, point)?.city ?? null) : null),
     [globe, pinned],
@@ -1075,7 +1058,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   // Leaving the Games panel ends the game
   const changeView = (next: ViewId) => {
-    setFollowing(null)
     setReplay(null)
     if (view === 'games' && next !== 'games') {
       quitGame()
@@ -1101,7 +1083,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       // The preview's own Escape leaves it, back to the panels as they were
       if (e.key !== 'Escape' || previewing) return
       if (wrapping) setWrapping(false)
-      else if (following) setFollowing(null)
       else if (replay) setReplay(null)
       else if (selected) selectCountry(null)
       else if (shownRoutes) setShownRoutes(null)
@@ -1114,7 +1095,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [wrapping, following, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
+  }, [wrapping, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
 
   /** The screensaver's preview, from Settings: nothing picked, from the screensaver's view */
   const startPreview = () => {
@@ -1180,9 +1161,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
           ? {}
           : {
               ...pointerHandlers,
-              // Taking hold of the globe stops following a trip
+              // Taking hold of the globe stops a replay
               onPointerDown: (e: ReactPointerEvent) => {
-                setFollowing(null)
                 setReplay(null)
                 pointerHandlers.onPointerDown(e)
               },
@@ -1218,15 +1198,12 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             trip={replayed && replayed.trip >= 0 ? replay.trips[replayed.trip] : null}
             index={Math.max(replayed?.trip ?? 0, 0)}
             count={replay.trips.length}
+            step={replay.one ? replayStepLabel : undefined}
+            paused={replay.clock.paused}
+            speed={replay.clock.speed}
+            onPause={pauseReplay}
+            onSpeed={speedUpReplay}
             onStop={() => setReplay(null)}
-          />
-        ) : following ? (
-          <FollowBar
-            name={tripOfFlight(following.legs[0].flight.id)?.trip.name.trim() || null}
-            leg={following.legs[followLeg]}
-            index={followLeg}
-            count={following.legs.length}
-            onStop={finishFollowing}
           />
         ) : (
           pickedTrip &&
@@ -1282,7 +1259,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             <VisitedTab
               view={visitedView}
               onViewChange={(next) => {
-                setFollowing(null)
+                setReplay(null)
                 setVisitedView(next)
                 if (next === 'years') showYear(review)
               }}
@@ -1349,7 +1326,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   onShowTrip={(trip) => (trip.routes.length ? showRoutes(trip.routes) : showPlaces(trip.items))}
                   onShowRoute={(route) => showRoutes([route])}
                   onShowPlace={showCountry}
-                  onFollowTrip={followTrip}
+                  onReplayTrip={replayTrip}
                   onReplay={canReplay ? startReplay : undefined}
                 />
               }

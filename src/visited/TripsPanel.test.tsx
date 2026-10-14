@@ -63,7 +63,7 @@ function setup() {
     onShowTrip: vi.fn(),
     onShowRoute: vi.fn(),
     onShowPlace: vi.fn(),
-    onFollowTrip: vi.fn(),
+    onReplayTrip: vi.fn(),
     onReplay: vi.fn(),
   }
   render(<Panel {...props} />)
@@ -223,10 +223,12 @@ describe('TripsPanel', () => {
     expect(actions.create).toHaveBeenCalledWith('', [{ kind: 'flight', flight: 'l' } satisfies TripItem])
   })
 
-  it('removes a trip, and follows or shows one on the globe', async () => {
-    const { actions, onFollowTrip, onShowTrip, trips: views } = setup()
-    await userEvent.click(screen.getByRole('button', { name: 'Follow the trip Spring in Asia' }))
-    expect(onFollowTrip).toHaveBeenCalledWith(views[0].routes)
+  it('removes a trip, and replays or shows one on the globe', async () => {
+    const { actions, onReplayTrip, onShowTrip, trips: views } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Replay the trip Spring in Asia' }))
+    expect(onReplayTrip).toHaveBeenCalledWith('asia')
+    // Nothing to replay in a trip with nothing in it
+    expect(screen.getAllByRole('button', { name: /^Replay the trip/ })).toHaveLength(1)
     await open(/Spring in Asia/)
     await userEvent.click(screen.getByRole('button', { name: 'Show on globe' }))
     expect(onShowTrip).toHaveBeenCalledWith(views[0])
