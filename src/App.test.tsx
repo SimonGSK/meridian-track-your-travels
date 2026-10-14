@@ -1606,6 +1606,36 @@ describe('App', () => {
       }
     })
 
+    it('draws each flight replayed behind its plane, as a trail, there and back once', async () => {
+      localStorage.setItem(
+        'countries-app.flights',
+        JSON.stringify([
+          { id: 'out', from: 'CPH', to: 'DXB', date: '2023-05' },
+          { id: 'back', from: 'DXB', to: 'CPH', date: '2023-05' },
+        ]),
+      )
+      withTrips({ name: 'Dubai', items: ['out', ['United Arab Emirates', '2023-05'], 'back'] })
+      render(<App />)
+      await openFlights()
+      await screen.findByRole('button', { name: 'Replay your trips' })
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Replay your trips' }))
+        act(() => vi.advanceTimersByTime(REPLAY_LEAD_IN * 1000 + 50))
+        const shown = () => flightLayer.show.mock.lastCall![0] as { key: string; drawn?: { startsAt: number; seconds: number } }[]
+        const [outbound] = shown()
+        const [plane] = flightLayer.show.mock.lastCall![1] as { timing: { startsAt: number; seconds: number[] } }[]
+        // Drawn as its plane flies it: from when it sets off, as long as it takes
+        expect(outbound.drawn).toEqual({ startsAt: plane.timing.startsAt, seconds: plane.timing.seconds[0] })
+        // The way back, once in the air, is the same line, drawn once already
+        act(() => vi.advanceTimersByTime((plane.timing.seconds[0] + REPLAY_PAUSE + 0.2) * 1000))
+        expect(flightLayer.show.mock.lastCall![1]).toHaveLength(2)
+        expect(shown()).toEqual([expect.objectContaining({ key: 'out', drawn: outbound.drawn })])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it('on a phone, puts the flights away while following a trip, and brings them back at the end', async () => {
       const matchMedia = window.matchMedia
       window.matchMedia = ((query: string) => ({ matches: query.includes('max-width: 640px'), media: query })) as typeof window.matchMedia

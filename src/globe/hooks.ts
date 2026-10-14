@@ -442,8 +442,8 @@ export function useFlightLayer(
 
   useEffect(() => {
     layer.current?.show(lines, journeys)
-    if (!globe || journeys.length === 0) return
-    // The planes fly while there are planes to show
+    if (!globe || (journeys.length === 0 && !lines.some((line) => line.drawn))) return
+    // The planes fly, and the trails are drawn behind them, while there are any
     const camera = globe.camera() as PerspectiveCamera
     const canvas = globe.renderer().domElement
     let frame = 0
