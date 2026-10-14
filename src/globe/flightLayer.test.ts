@@ -70,6 +70,29 @@ describe('createFlightLayer', () => {
     layer.dispose()
   })
 
+  it('draws a line behind its plane as it flies, as a trail, when timed', () => {
+    const layer = createFlightLayer(RADIUS)
+    const route = { from: copenhagen, to: bangkok }
+    layer.show(
+      [{ key: 'trail', ...route, drawn: { startsAt: 100, seconds: 4 } }, { key: 'whole', from: copenhagen, to: paris }],
+      [{ key: 'plane', legs: [route], timing: { startsAt: 100, seconds: [4], stop: 0 } }],
+    )
+    const [trail, whole] = parts(layer).tubes
+    const full = trail.geometry.index!.count
+    /** How much of the trail is drawn, from 0 to 1 */
+    const drawn = (at: number) => {
+      layer.tick(at, camera(), 800, 800)
+      return trail.geometry.drawRange.count / full
+    }
+    expect(drawn(50)).toBe(0) // not off yet
+    expect(drawn(101)).toBeCloseTo(0.25, 1)
+    expect(drawn(102)).toBeCloseTo(0.5, 1) // halfway, where its plane is
+    expect(drawn(104)).toBe(1)
+    expect(drawn(500)).toBe(1) // and stays
+    expect(whole.geometry.drawRange.count).toBe(Infinity) // all at once
+    layer.dispose()
+  })
+
   it('dashes a flight still to come', () => {
     const layer = createFlightLayer(RADIUS)
     layer.show([lines[0], { key: 'soon', from: copenhagen, to: paris, upcoming: true }], [{ key: 'trip', legs: [lines[0]] }])

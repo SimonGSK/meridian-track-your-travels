@@ -867,12 +867,17 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     // Replaying: the flights flown so far, those of the trip it's on standing out, each plane flying once in its turn
     if (replay && replayed) {
       return {
-        lines: uniqueRoutes(replayed.flights.map((step) => step.route)).map((route) => ({
-          key: route.flight.id,
-          from: route.from,
-          to: route.to,
-          highlighted: replayed.flights.some((step) => step.trip === replayed.trip && uniqueRoutes([route, step.route]).length === 1),
-        })),
+        // Each drawn behind the plane that first flies it, as a trail
+        lines: uniqueRoutes(replayed.flights.map((step) => step.route)).map((route) => {
+          const first = replayed.flights.find((step) => step.route === route)!
+          return {
+            key: route.flight.id,
+            from: route.from,
+            to: route.to,
+            highlighted: replayed.flights.some((step) => step.trip === replayed.trip && uniqueRoutes([route, step.route]).length === 1),
+            drawn: { startsAt: replay.startedAt + first.at, seconds: first.seconds },
+          }
+        }),
         journeys: replayed.flights.map((step) => ({
           key: `replay-${step.at}`,
           legs: [step.route],

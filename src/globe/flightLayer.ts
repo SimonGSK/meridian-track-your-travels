@@ -21,13 +21,18 @@ import { LAND_ALTITUDE } from './style'
 
 type LatLng = { lat: number; lng: number }
 
-/** A route to draw: from where to where, whether it's the one picked, and whether it's still to come (dashed) */
+/**
+ * A route to draw: from where to where, whether it's the one picked, and whether it's still to come (dashed).
+ * With `drawn`, it's drawn behind its plane as it flies, from `startsAt` (on the tick's clock) over these seconds,
+ * as a trail; else all at once
+ */
 export type FlightLine = {
   key: string
   from: LatLng
   to: LatLng
   highlighted?: boolean
   upcoming?: boolean
+  drawn?: { startsAt: number; seconds: number }
 }
 
 /**
@@ -48,6 +53,8 @@ export const FLIGHT_BASE = LAND_ALTITUDE * 1.5
 const RISE = 0.15
 /** Points along each route */
 const SAMPLES = 64
+/** Sides of each route's tube */
+const SIDES = 5
 /** Width of a route's line, in globe units (the globe's radius is 100) */
 const LINE_RADIUS = 0.22
 const HIGHLIGHT_RADIUS = 0.38
@@ -142,7 +149,7 @@ export function createFlightLayer(globeRadius: number): FlightLayer {
   const texture = planeTexture()
   const dashes = dashTexture()
   const colors = { line: new Color('#ffffff'), highlight: new Color('#ffffff') }
-  let lines: { mesh: Mesh<TubeGeometry, MeshBasicMaterial>; highlighted: boolean }[] = []
+  let lines: { mesh: Mesh<TubeGeometry, MeshBasicMaterial>; highlighted: boolean; drawn?: FlightLine['drawn'] }[] = []
   let planes: (Plane & { highlighted: boolean })[] = []
 
   const clear = () => {
@@ -173,7 +180,9 @@ export function createFlightLayer(globeRadius: number): FlightLayer {
       for (const route of routes) {
         const highlighted = !!route.highlighted
         const path = flightPath(route.from, route.to, globeRadius)
-        const tube = new TubeGeometry(new CatmullRomCurve3(path), SAMPLES, highlighted ? HIGHLIGHT_RADIUS : LINE_RADIUS, 5)
+        const tube = new TubeGeometry(new CatmullRomCurve3(path), SAMPLES, highlighted ? HIGHLIGHT_RADIUS : LINE_RADIUS, SIDES)
+        // A trail: nothing of it until its plane sets off
+        if (route.drawn) tube.setDrawRange(0, 0)
         const radians = geoDistance([route.from.lng, route.from.lat], [route.to.lng, route.to.lat])
         const mesh = new Mesh(
           tube,
@@ -185,7 +194,7 @@ export function createFlightLayer(globeRadius: number): FlightLayer {
           }),
         )
         object.add(mesh)
-        lines.push({ mesh, highlighted })
+        lines.push({ mesh, highlighted, drawn: route.drawn })
       }
       for (const journey of journeys) {
         if (journey.legs.length === 0) continue
@@ -217,6 +226,12 @@ export function createFlightLayer(globeRadius: number): FlightLayer {
       paint()
     },
     tick(seconds, camera, width, height) {
+      // Trails as far as their planes have flown: the tube's first segments, each its sides' two triangles
+      for (const { mesh, drawn } of lines) {
+        if (!drawn) continue
+        const t = Math.min(Math.max((seconds - drawn.startsAt) / drawn.seconds, 0), 1)
+        mesh.geometry.setDrawRange(0, Math.round(t * SAMPLES) * SIDES * 6)
+      }
       // Sprites that don't scale with distance are sized by the camera's projection
       const scale = PLANE_SIZE_PX / ((camera.projectionMatrix.elements[5] * height) / 2)
       for (const plane of planes) {
