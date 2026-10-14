@@ -505,7 +505,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     rename: renameTrip,
     remove: (id) => {
       const view = tripViews.find((v) => v.trip.id === id)
-      offerUndo(`Removed the trip ${view ? titleOf(view) : ''}`.trim(), removeTrip(id))
+      const undo = removeTrip(id)
+      // A trip with nothing in it, nor a name, is nothing to take back
+      if (view && view.items.length === 0 && !view.trip.name.trim() && !view.trip.note?.trim()) return
+      offerUndo(`Removed the trip ${view ? titleOf(view) : ''}`.trim(), undo)
     },
     add: addToTrip,
     takeOut: takeOutOfTrip,

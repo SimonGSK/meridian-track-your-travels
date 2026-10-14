@@ -1136,8 +1136,9 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
       await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
       expect(screen.getByText('Flights', { selector: 'dt' }).nextElementSibling).toHaveTextContent('1')
-      // Its trip, first, counted down to, with the flag of where it goes
-      const [booked] = document.querySelectorAll<HTMLElement>('.trip-header')
+      // Its trip, counted down to, with the flag of where it goes, under the flight without a date (a trip of its own, at
+      // the top, as it has none)
+      const booked = [...document.querySelectorAll<HTMLElement>('.trip-header')].find((header) => /in \d+ months/.test(header.textContent!))!
       expect(booked).toHaveTextContent(/^Mar \d{4} · in \d+ months$/)
       expect(within(booked).getByRole('img', { name: 'Japan' })).toBeInTheDocument()
     })
@@ -1693,8 +1694,8 @@ describe('App', () => {
     it('makes a trip, and adds a place and a flight to it, the place after the flight that lands there', async () => {
       render(<App />)
       await openFlights()
+      // Made at once, opened at the top, to add to straight away
       await userEvent.click(screen.getByRole('button', { name: 'New trip' }))
-      await userEvent.type(screen.getByRole('textbox', { name: 'Name of the new trip' }), 'Thailand{Enter}')
       await userEvent.click(screen.getByRole('button', { name: 'Place' }))
       await userEvent.type(screen.getByRole('searchbox', { name: 'Place to add' }), 'thai')
       await userEvent.click(within(screen.getByRole('list', { name: 'Places found' })).getByRole('button', { name: /^Thailand/ }))

@@ -58,7 +58,7 @@ describe('isSavedTrips', () => {
 })
 
 describe('tripViewsOf', () => {
-  it('has each trip with its flights, when it was and how far, newest first, those without a date last', () => {
+  it('has each trip with its flights, when it was and how far, newest first, those without a date yet at the top', () => {
     const views = tripViewsOf(
       [
         trip('old', [visit('United Kingdom', '2017-11')]),
@@ -67,9 +67,9 @@ describe('tripViewsOf', () => {
       ],
       asia,
     )
-    expect(views.map((v) => v.trip.id)).toEqual(['asia', 'old', 'empty'])
-    expect(views[0].routes.map((r) => r.flight.id)).toEqual(['a', 'b', 'c'])
-    expect([views[0].date, views[0].endDate, views[0].km]).toEqual(['2024-04', '2024-05', 18_800])
+    expect(views.map((v) => v.trip.id)).toEqual(['empty', 'asia', 'old'])
+    expect(views[1].routes.map((r) => r.flight.id)).toEqual(['a', 'b', 'c'])
+    expect([views[1].date, views[1].endDate, views[1].km]).toEqual(['2024-04', '2024-05', 18_800])
   })
 
   it('leaves out flights no longer there, and a visit or flight in more than one trip from all but the first', () => {

@@ -240,13 +240,12 @@ test.describe('visited cities', () => {
 })
 
 test.describe('trips', () => {
-  /** Opens the Trips list, and a new trip in it */
+  /** Opens the Trips list, and a new trip in it, named where its name shows */
   async function newTrip(page: Page, name: string) {
     await page.getByRole('button', { name: 'Visited', exact: true }).click()
     await page.getByRole('tab', { name: 'Trips' }).click()
     await page.getByRole('button', { name: 'New trip' }).click()
-    await page.getByRole('textbox', { name: 'Name of the new trip' }).fill(name)
-    await page.keyboard.press('Enter')
+    await page.getByRole('textbox', { name: 'Name of the trip' }).fill(name)
   }
   /** Adds a flight in the trip open, From and To found by what's typed, in 2024 if it has no date yet */
   async function addFlight(page: Page, from: string | null, to: string) {
@@ -534,9 +533,8 @@ test.describe('year in review', () => {
     await expect(page.getByText(/^No dates yet/)).toBeVisible()
 
     await page.getByRole('tab', { name: 'Trips' }).click()
+    // Made at once, opened, to add to straight away
     await page.getByRole('button', { name: 'New trip' }).click()
-    await page.getByRole('textbox', { name: 'Name of the new trip' }).fill('Tokyo')
-    await page.keyboard.press('Enter')
     await page.getByRole('button', { name: 'Place', exact: true }).click()
     await page.getByRole('searchbox', { name: 'Place to add' }).fill('japan')
     await page.getByRole('list', { name: 'Places found' }).getByRole('button', { name: /^Japan/ }).click()
@@ -554,7 +552,10 @@ test.describe('year in review', () => {
     await expect(april).toContainText('First visit')
     // Its panel has the visit, in its trip
     await april.getByRole('button', { name: /^Japan/ }).click()
-    await expect(panel(page).getByRole('list', { name: 'Visits' })).toContainText(/Apr 2023.*Tokyo/)
+    const visits = panel(page).getByRole('list', { name: 'Visits' })
+    await expect(visits).toContainText('Apr 2023')
+    // The trip it was in, unnamed, by its flag
+    await expect(visits.getByRole('button', { name: 'Open the trip Japan' })).toBeVisible()
   })
 })
 

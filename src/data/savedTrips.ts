@@ -80,7 +80,8 @@ export type TripView = {
 /**
  * The trips as they stand, newest first: flights no longer there left out,
  * and each visit and flight in the first trip it's in only. Trips without
- * a date come last, the newest made first.
+ * a date come first, the newest made at the top, as one being made does
+ * until it has a date.
  */
 export function tripViewsOf(trips: readonly SavedTrip[], routes: readonly Route[]): TripView[] {
   const routeOf = new Map(routes.map((route) => [route.flight.id, route]))
@@ -111,7 +112,8 @@ export function tripViewsOf(trips: readonly SavedTrip[], routes: readonly Route[
   const dated = views
     .filter(({ view }) => view.date)
     .sort((a, b) => newestFirst(a.view.date!, b.view.date!) || newestFirst(a.view.endDate!, b.view.endDate!) || b.made - a.made)
-  return [...dated, ...views.filter(({ view }) => !view.date).reverse()].map(({ view }) => view)
+  // Those with no date yet first, the newest made at the top, as one being made is: then the rest, newest first
+  return [...views.filter(({ view }) => !view.date).reverse(), ...dated].map(({ view }) => view)
 }
 
 /** Every visit in a trip, each once */

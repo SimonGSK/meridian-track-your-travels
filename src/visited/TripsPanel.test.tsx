@@ -4,7 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Airport } from '../data/airports'
 import type { Route } from '../data/flights'
-import { looseOf, tripViewsOf, type SavedTrip, type TripItem } from '../data/savedTrips'
+import { looseOf, tripViewsOf, type SavedTrip, type TripItem, type TripView } from '../data/savedTrips'
 import type { VisitDate } from '../data/visitDates'
 import TripsPanel, { type TripActions } from './TripsPanel'
 
@@ -38,7 +38,7 @@ const TRIPS: SavedTrip[] = [
   { id: 'empty', name: '', items: [] },
 ]
 
-function setup() {
+function setup(trips: SavedTrip[] = TRIPS) {
   const actions: { [K in keyof TripActions]: ReturnType<typeof vi.fn> } = {
     create: vi.fn(() => 'new'),
     rename: vi.fn(),
@@ -52,7 +52,7 @@ function setup() {
     redateFlight: vi.fn(),
     removeFlight: vi.fn(),
   }
-  const views = tripViewsOf(TRIPS, ROUTES)
+  const views = tripViewsOf(trips, ROUTES)
   const props = {
     trips: views,
     loose: looseOf(views, MARKED, ROUTES),
@@ -82,6 +82,7 @@ const headers = () => [...document.querySelectorAll<HTMLElement>('.trip-header')
 const header = (name: RegExp) => screen.getAllByRole('button', { name }).find((b) => b.classList.contains('trip-header'))!
 const open = (name: RegExp) => userEvent.click(header(name))
 const items = () => within(screen.getByRole('list', { name: /^What the trip/ })).getAllByRole('listitem')
+const asiaOf = (views: TripView[]) => views.find((view) => view.trip.id === 'asia')!
 
 describe('TripsPanel', () => {
   it('adds up the trips, the flights and how far', () => {
@@ -91,9 +92,10 @@ describe('TripsPanel', () => {
 
   it('lists the trips newest first, with when, their name if they have one, and the flags of where they went', () => {
     setup()
-    expect(headers().map((h) => h.textContent)).toEqual(['Apr 2024Spring in Asia Cherry blossoms', 'Nothing in it yet'])
-    expect(within(headers()[0]).getAllByRole('img').map((flag) => flag.getAttribute('alt'))).toEqual(['Japan', 'South Korea'])
-    expect(headers()[0]).toHaveAttribute('aria-expanded', 'false')
+    // A new one, without a date yet, at the top
+    expect(headers().map((h) => h.textContent)).toEqual(['Nothing in it yet', 'Apr 2024Spring in Asia Cherry blossoms'])
+    expect(within(headers()[1]).getAllByRole('img').map((flag) => flag.getAttribute('alt'))).toEqual(['Japan', 'South Korea'])
+    expect(headers()[1]).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('shows just the flags and when for a trip without a name', () => {
@@ -130,7 +132,7 @@ describe('TripsPanel', () => {
     const { actions, trips: views } = setup()
     await open(/Spring in Asia/)
     fireEvent.keyDown(screen.getByRole('button', { name: 'Move South Korea, now 4 of 4' }), { key: 'ArrowUp' })
-    expect(actions.move).toHaveBeenCalledWith('asia', views[0].items, 3, 2)
+    expect(actions.move).toHaveBeenCalledWith('asia', asiaOf(views).items, 3, 2)
     fireEvent.keyDown(screen.getByRole('button', { name: 'Move South Korea, now 4 of 4' }), { key: 'ArrowDown' })
     expect(actions.move).toHaveBeenCalledTimes(1) // already last
   })
@@ -159,11 +161,43 @@ describe('TripsPanel', () => {
     expect(actions.rename).toHaveBeenLastCalledWith('empty', { name: 'X', note: undefined })
   })
 
-  it('makes a new trip, opened to put things in', async () => {
-    const { actions } = setup()
+  it('makes a new trip at once, to add to straight away, with no name asked for', async () => {
+    const { actions } = setup(TRIPS.filter((trip) => trip.id !== 'empty'))
     await userEvent.click(screen.getByRole('button', { name: 'New trip' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Name of the new trip' }), 'Peru{Enter}')
-    expect(actions.create).toHaveBeenCalledWith('Peru', [])
+    expect(actions.create).toHaveBeenCalledWith('', [])
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('opens the new trip still blank, rather than making another', async () => {
+    const { actions } = setup()
+    expect(header(/Nothing in it yet/)).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(screen.getByRole('button', { name: 'New trip' }))
+    expect(actions.create).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Name of the trip' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Place' })).toBeInTheDocument()
+  })
+
+  it('has a trip being made named where its name shows, rather than closed by it', async () => {
+    const { actions } = setup()
+    await open(/Nothing in it yet/)
+    // Its name to write, not a header to close it with, nor a pencil
+    expect(screen.queryByRole('button', { name: /Nothing in it yet/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Name the trip Unnamed trip' })).not.toBeInTheDocument()
+    const name = screen.getByRole('textbox', { name: 'Name of the trip' })
+    expect(name).toHaveAttribute('placeholder', 'Name it, if you like')
+    await userEvent.type(name, 'P')
+    expect(actions.rename).toHaveBeenLastCalledWith('empty', { name: 'P', note: undefined })
+  })
+
+  it('takes a blank trip away once another is opened, but not one with something in it', async () => {
+    const { actions } = setup()
+    await open(/Nothing in it yet/)
+    await open(/Spring in Asia/)
+    expect(actions.remove).toHaveBeenCalledWith('empty')
+    actions.remove.mockClear()
+    await open(/Spring in Asia/)
+    await open(/Spring in Asia/)
+    expect(actions.remove).not.toHaveBeenCalled()
   })
 
   it('adds a place to a trip, with when, after the flight that landed there', async () => {
@@ -205,7 +239,7 @@ describe('TripsPanel', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'To' }), 'cph')
     await userEvent.click(within(screen.getByRole('list', { name: 'To airports' })).getByRole('button', { name: /CPH/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Add flight' }))
-    expect(actions.addFlight).toHaveBeenCalledWith('asia', ICN, CPH, '2024-04', views[0].items)
+    expect(actions.addFlight).toHaveBeenCalledWith('asia', ICN, CPH, '2024-04', asiaOf(views).items)
   })
 
   it('lists the places visited that no trip went to, each once, and puts one in a trip, or a new one', async () => {
@@ -231,7 +265,7 @@ describe('TripsPanel', () => {
     expect(screen.getAllByRole('button', { name: /^Replay the trip/ })).toHaveLength(1)
     await open(/Spring in Asia/)
     await userEvent.click(screen.getByRole('button', { name: 'Show on globe' }))
-    expect(onShowTrip).toHaveBeenCalledWith(views[0])
+    expect(onShowTrip).toHaveBeenCalledWith(asiaOf(views))
     await userEvent.click(screen.getByRole('button', { name: 'Remove trip' }))
     expect(actions.remove).toHaveBeenCalledWith('asia')
   })
