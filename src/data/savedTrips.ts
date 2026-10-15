@@ -2,7 +2,7 @@ import { countryOf } from './airports'
 import type { Route } from './flights'
 import { tripsOf } from './trips'
 import { monthOf, type Day } from './plans'
-import { isVisitDate, newestFirst, partsOf, type VisitDate } from './visitDates'
+import { formatVisitDate, isVisitDate, newestFirst, partsOf, type VisitDate } from './visitDates'
 
 /**
  * Trips as you make them: your visits and flights, in the order you went,
@@ -293,4 +293,13 @@ export function journeysOf(routes: readonly Route[], trips: readonly SavedTrip[]
   )
   const loose = routes.filter((route) => !taken.has(route.flight.id))
   return [...inTrips.filter((legs) => legs.length > 0), ...tripsOf(loose).map((trip) => trip.routes)]
+}
+
+/** When a trip was, from its first date to its last: "Apr 2024", "Apr – May 2024", or "Dec 2024 – Jan 2025" */
+export function whenOf(date: VisitDate | null, end: VisitDate | null) {
+  if (!date) return null
+  if (!end || end === date) return formatVisitDate(date)
+  const [from, to] = [partsOf(date), partsOf(end)]
+  const start = from.year === to.year && from.month && to.month ? formatVisitDate(date).split(' ')[0] : formatVisitDate(date)
+  return `${start} – ${formatVisitDate(end)}`
 }

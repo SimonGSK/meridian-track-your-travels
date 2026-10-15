@@ -81,6 +81,7 @@ import TripsPanel, { type TripActions } from './visited/TripsPanel'
 import { useTrips, newId } from './visited/useTrips'
 import VisitedTab, { type VisitedView } from './visited/VisitedTab'
 import YearsPanel from './visited/YearsPanel'
+import TripCardView from './visited/TripCardView'
 import WrappedView from './visited/WrappedView'
 import { reviewOf, spotsOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { EARTH_KM, distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
@@ -536,6 +537,16 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   // A year wrapped: its card full screen, to keep or share
   const [wrapping, setWrapping] = useState(false)
+  // A trip as a card, the same way, by its id (from its card in the Trips list)
+  const [sharingTrip, setSharingTrip] = useState<string | null>(null)
+  const sharedTrip = useMemo(() => tripViews.find((view) => view.trip.id === sharingTrip) ?? null, [tripViews, sharingTrip])
+  /** When a place was first been to, or for one not been to yet, will be first: on that trip, it's new */
+  const firstVisitOf = useCallback(
+    (place: string) =>
+      datesOf(place).at(-1) ??
+      (visited.has(place) ? null : (visitsToCome.flatMap((visit) => (visit.place === place && visit.date ? [visit.date] : [])).sort(newestFirst).at(-1) ?? null)),
+    [datesOf, visited, visitsToCome],
+  )
 
   // Replaying trips: every trip been on, oldest first (from the Trips list), or one (from its card), its flights flown,
   // each drawn behind its plane, and its places colored as they're reached, staying colored. It runs on its own clock,
@@ -1076,7 +1087,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     const onKeyDown = (e: KeyboardEvent) => {
       // The preview's own Escape leaves it, back to the panels as they were
       if (e.key !== 'Escape' || previewing) return
-      if (wrapping) setWrapping(false)
+      if (sharingTrip) setSharingTrip(null)
+      else if (wrapping) setWrapping(false)
       else if (replay) setReplay(null)
       else if (selected) selectCountry(null)
       else if (shownRoutes) setShownRoutes(null)
@@ -1089,7 +1101,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [wrapping, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
+  }, [sharingTrip, wrapping, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
 
   /** The screensaver's preview, from Settings: nothing picked, from the screensaver's view */
   const startPreview = () => {
@@ -1311,6 +1323,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   onShowRoute={(route) => showRoutes([route])}
                   onShowPlace={showCountry}
                   onReplayTrip={replayTrip}
+                  onShareTrip={setSharingTrip}
                   onReplay={canReplay ? startReplay : undefined}
                 />
               }
@@ -1382,6 +1395,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       />
       <FlagCorner country={playing ? null : hovered} />
       {wrapping && review && <WrappedView review={review} onClose={() => setWrapping(false)} />}
+      {sharedTrip && <TripCardView view={sharedTrip} firstVisitOf={firstVisitOf} onClose={() => setSharingTrip(null)} />}
 
       {/* Notes at the bottom, one over the other */}
       <div className="toasts">
