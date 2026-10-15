@@ -82,8 +82,7 @@ import { useTrips, newId } from './visited/useTrips'
 import VisitedTab, { type VisitedView } from './visited/VisitedTab'
 import YearsPanel from './visited/YearsPanel'
 import WrappedView from './visited/WrappedView'
-import { reviewOf, spotsOf, spotsOfStep, timelineOf, yearsOf, type YearReview } from './visited/yearInReview'
-import { useTimeLapse } from './visited/useTimeLapse'
+import { reviewOf, spotsOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { EARTH_KM, distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
 import {
   journeysOf,
@@ -156,8 +155,11 @@ const spotsOfPlaces = (names: readonly string[]): Spot[] =>
 const RELIEF = 40
 const NO_FLIGHTS = { lines: [], journeys: [] }
 
-/** Trips replayed: all, or one (from its card), on the replay's own clock, and whether the panel made way for it */
-type Replaying = ReturnType<typeof replayOf> & { clock: ReplayClock; reopen: boolean; one: boolean }
+/**
+ * Trips replayed: all, a year's (from the Years view), or one (from its card), on the replay's own clock, and whether
+ * the panel made way for it
+ */
+type Replaying = ReturnType<typeof replayOf> & { clock: ReplayClock; reopen: boolean; one: boolean; year: number | null }
 
 
 /** Phones show one panel at a time, as a sheet over the globe */
@@ -545,9 +547,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [replaySpeed, setReplaySpeed] = useState<ReplaySpeed>(1)
   const canReplay = useMemo(() => replayOf(tripViews).steps.length > 0, [tripViews])
   const playReplay = useCallback(
-    (played: ReturnType<typeof replayOf>, { reopen = false, one = false } = {}) => {
+    (played: ReturnType<typeof replayOf>, { reopen = false, one = false, year = null as number | null } = {}) => {
       setReplayAt(-1)
-      setReplay({ ...played, clock: startClock(performance.now() / 1000, replaySpeed), reopen, one })
+      setReplay({ ...played, clock: startClock(performance.now() / 1000, replaySpeed), reopen, one, year })
     },
     [replaySpeed],
   )
@@ -564,6 +566,19 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     selectCountry(null)
     setShownRoutes(view.routes.length > 0 ? view.routes : null)
     playReplay(replayOfTrip(view), { reopen: isPhone(), one: true })
+    if (isPhone()) setView('explore')
+  }
+  /** The trips of a year, from the Years view: those with anything in it */
+  const tripsIn = useCallback(
+    (year: number) =>
+      tripViews.filter((view) => view.date && Number(view.date.slice(0, 4)) <= year && year <= Number(view.endDate!.slice(0, 4))),
+    [tripViews],
+  )
+  const yearReplayable = useMemo(() => !!review && replayOf(tripsIn(review.year)).steps.length > 0, [review, tripsIn])
+  const replayYear = (year: number) => {
+    selectCountry(null)
+    setShownRoutes(null)
+    playReplay(replayOf(tripsIn(year)), { reopen: isPhone(), year })
     if (isPhone()) setView('explore')
   }
   const pauseReplay = () =>
@@ -642,18 +657,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const yearsOpen = view === 'visited' && visitedView === 'years' && !showsGame(game)
   const yearShown = yearsOpen ? review : null
 
-  // The time-lapse plays through the years in the Years view: all you'd been to by each, the new places in green
-  const timeline = useMemo(() => timelineOf({ visited, datesOf, routes }), [visited, datesOf, routes])
-  const { lapse, play: playLapse, pause: pauseLapse, stop: stopLapse } = useTimeLapse(timeline.length)
-  const lapseStep = yearsOpen && lapse ? timeline[lapse.step] : null
-  // Leaving the years ends it
-  useEffect(() => {
-    if (!yearsOpen) stopLapse()
-  }, [yearsOpen, stopLapse])
-  useEffect(() => {
-    if (lapseStep) flyToSee(spotsOfStep(lapseStep))
-  }, [lapseStep, flyToSee])
-
   const highlights = useMemo(() => {
     const colors = gameHighlights(game, theme)
     // Replaying, the places of the trip it's on stand out over those before
@@ -663,16 +666,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         ...countries.filter((c) => replayed.thisTrip.has(c.properties.name)).map((c) => [c, theme.correct] as const),
       ])
     }
-    // In the time-lapse, the year's places stand out over those before: new ones brighter than those visited again
-    if (lapseStep) {
-      return new Map([
-        ...colors,
-        ...lapseStep.revisits.map((c) => [c, revisitColor(theme)] as const),
-        ...lapseStep.newPlaces.map((c) => [c, theme.correct] as const),
-      ])
-    }
     return editing ? new Map([...colors, [editing, theme.selected]]) : colors
-  }, [game, theme, editing, lapseStep, replayed])
+  }, [game, theme, editing, replayed])
 
   // Games get a clean globe: no visited colors, and hover only where the globe is the answer
   // In games only countries are answers, so territories don't light up
@@ -683,8 +678,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const colorHovered = hoverable ? hovered : null
   const colorVisited = replayed
     ? replayed.places
-    : lapseStep
-    ? lapseStep.names
     : yearShown
       ? yearShown.names
       : showsGame(game) || !settings.showVisited
@@ -695,9 +688,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   // the real one doesn't know your friend
   const compareOpen = view === 'more' && moreOpen === 'compare' && !showsGame(game) && !previewing
   const compareShown = compareOpen && !!comparison && friendShown && colorVisited === visited
-  // A year picked in the Years tab: its places first visited then, and those visited again a darker shade, as in the
-  // time-lapse
-  const yearPicked = lapseStep ? null : yearShown
+  // A year picked in the Years tab: its places first visited then, and those visited again a darker shade; not while
+  // a replay shows the trips instead
+  const yearPicked = replay ? null : yearShown
   const markedColors = useMemo(() => {
     if (compareShown && comparison) {
       return new Map([
@@ -896,11 +889,10 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     // The flights taken, and those booked, each if switched on (a year shows its flights all the same)
     const flownShown = !!yearShown || settings.showFlights
-    const bookedShown = !lapseStep && !yearShown && settings.showFutureFlights
+    const bookedShown = !yearShown && settings.showFutureFlights
     if (showsGame(game) || compareOpen || (!flownShown && !bookedShown)) return NO_FLIGHTS
-    // In the time-lapse, the flights so far, that year's standing out
-    const picked = lapseStep ? lapseStep.newFlights : (shownRoutes ?? [])
-    const flown = flownShown ? (lapseStep ? lapseStep.flights : yearShown ? yearShown.flights : routes) : []
+    const picked = shownRoutes ?? []
+    const flown = flownShown ? (yearShown ? yearShown.flights : routes) : []
     const isPicked = (route: Route) => picked.some((p) => uniqueRoutes([route, p]).length === 1)
     const lines = uniqueRoutes(flown).map((route) => ({
       key: route.flight.id,
@@ -915,7 +907,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }))
     // Flights booked, dashed, on the globe as it is: each route once (dashes there and back would fill each other's
     // gaps), and not over one flown already
-    if (lapseStep || yearShown) return { lines, journeys }
+    if (yearShown) return { lines, journeys }
     const booked = uniqueRoutes(bookedShown ? upcomingRoutes : []).filter(
       (route) => !flown.some((f) => uniqueRoutes([f, route]).length === 1),
     )
@@ -936,7 +928,6 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     cityAnswer,
     routes,
     upcomingRoutes,
-    lapseStep,
     yearShown,
     compareOpen,
     settings.showFlights,
@@ -1202,6 +1193,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             index={Math.max(replayed?.trip ?? 0, 0)}
             count={replay.trips.length}
             step={replay.one ? replayStepLabel : undefined}
+            year={replay.year}
             paused={replay.clock.paused}
             speed={replay.clock.speed}
             onPause={pauseReplay}
@@ -1227,14 +1219,12 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
             ]}
           />
         )}
-        {(lapseStep || (yearPicked && yearPicked.places.length > 0)) && (
+        {yearPicked && yearPicked.places.length > 0 && (
           <GlobeKey
-            title={String((lapseStep ?? yearPicked)!.year)}
+            title={String(yearPicked.year)}
             items={[
               { label: 'New', color: theme.correct },
               { label: 'Again', color: revisitColor(theme) },
-              // The time-lapse shows the years before too
-              ...(lapseStep ? [{ label: 'Earlier', color: theme.visited }] : []),
             ]}
           />
         )}
@@ -1298,16 +1288,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   review={review}
                   noteOf={noteOf}
                   onWrap={() => setWrapping(true)}
-                  lapse={{
-                    steps: timeline,
-                    shown: lapse,
-                    onPlay: playLapse,
-                    onPause: pauseLapse,
-                    onStop: () => {
-                      stopLapse()
-                      showYear(review)
-                    },
-                  }}
+                  onReplay={yearReplayable ? () => replayYear(review!.year) : undefined}
                   onYearChange={(year) => {
                     setPickedYear(year)
                     showYear(reviewOf(year, { visited, datesOf, routes }))

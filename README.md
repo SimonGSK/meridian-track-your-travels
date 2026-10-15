@@ -1,12 +1,12 @@
 # Meridian
 
-An interactive 3D globe for keeping track of where you've been. Mark the countries, states and cities you've visited and when, put your visits and flights together into trips, look back on each year or replay them all as a time-lapse, keep a wishlist, compare your travels with a friend's, and test your geography with twelve games.
+An interactive 3D globe for keeping track of where you've been. Mark the countries, states and cities you've visited and when, put your visits and flights together into trips, look back on each year, replay your trips flight by flight, keep a wishlist, compare your travels with a friend's, and test your geography with fourteen games.
 
 **Try it at https://simongsk.github.io/meridian-track-your-travels/**. It runs in any browser, on a phone too, can be installed as an app, and works offline. Everything you add stays in your browser.
 
 - **Your travels**: countries out of the world's 197, states and provinces (USA, Canada, Australia, Brazil), cities with pins, each visit by month with a note, a heat map by visits, a wishlist, and 62 achievements to earn.
 - **Trips**: your visits and the flights between them, in the order you went, named, rearranged by dragging; flights between 3,244 airports, drawn as arcs with little planes.
-- **Years**: a review of each year, the globe showing just that year, and a time-lapse of them all.
+- **Years**: a review of each year, the globe showing just that year, and its trips replayed.
 - **With a friend**: your places and a friend's on one globe, from a link, with nothing going through a server.
 - **Games**: a daily challenge, finding countries and cities on the globe, naming neighbours, flags, shapes, capitals, higher or lower, and more, with best scores and time records.
 - **The globe**: seven designs, one of them the Earth as seen from space, day and night from where the sun really is, city lights, and your Mac's screensaver.
@@ -46,7 +46,7 @@ The design (navy and amber, after a mock-up made in Lovable) has a top bar with 
 
   Under Years, a review of each year you've dated a visit or a flight, from the newest, with ‹ › for the others. It has:
 
-  - a summary ("6 countries on 4 continents, 5 new places." and "5 flights, 25.6K km."). A territory counts as the country it belongs to, so a year with Iceland and Greenland is 2 countries, Iceland and Denmark. Only places that are no country's (Antarctica, Western Sahara, the Siachen Glacier) are counted apart, as territories. The new places are those first visited that year, territories too, and they're the ones in green: Greenland is new the first time you're there, even if you'd been to Denmark. The time-lapse and the wrapped card count the same way;
+  - a summary ("6 countries on 4 continents, 5 new places." and "5 flights, 25.6K km."). A territory counts as the country it belongs to, so a year with Iceland and Greenland is 2 countries, Iceland and Denmark. Only places that are no country's (Antarctica, Western Sahara, the Siachen Glacier) are counted apart, as territories. The new places are those first visited that year, territories too, and they're the ones in green: Greenland is new the first time you're there, even if you'd been to Denmark. The wrapped card counts the same way;
   - the countries, first visits (places whose earliest visit is that year) and continents;
   - the flights, how far, and the longest;
   - "Your most travelled year" on the year with the most places.
@@ -55,7 +55,7 @@ The design (navy and amber, after a mock-up made in Lovable) has a top bar with 
 
   "✨ Your 2025, wrapped" makes the year a card to keep or share, in the style of a phone's story (1080 × 1920): the year in big type, a small globe turned to its places (those new that year green, as many as the "new" figure, and those visited before in the visited color), how many countries, how many new and on how many continents, the flags of its places (the new ones ringed, up to 18), and its flights (how many, how far, how many times around the Earth, the longest) or else its busiest month. It's drawn on a canvas in the app's own colors. **Save image** downloads it as a PNG, and on a phone **Share** sends it straight to another app; Escape or ✕ puts it away.
 
-  "▶ Replay your travels" plays the years as a time-lapse, from the first with a date to the last, about two seconds each. Each year the globe shows everywhere you'd been by its end, in the visited color, with that year's places standing out: those first visited that year in green, and those you went back to in a darker green, with a key at the bottom. That year's flights stand out among those before. It turns to each year's places, and the panel shows the year, the countries, continents and flights so far, what was new, and where you went back to. Pause, play on, replay, or go back to the years; leaving the Years view ends it.
+  "▶ Replay 2024" replays the year's trips on the globe, as "Replay your trips" in Trips does all of them: each flight flown by its plane, drawing it as it goes, and each place colored as it's reached, the globe turning to each, with the bar at the bottom ("Your 2024, from the first trip", then each trip, "1 of 3"), to pause, play faster or stop. A trip that goes over the new year is in both. At the end the globe shows the year again; leaving the Years view stops it.
 - **Games**: the daily challenge first, then the others by what they ask about: countries, flags, capitals, cities and facts. Each kind is a card saying how many games it has, opening a list of them (or the game itself, for a kind with one), so the start fits without scrolling. A game's setup goes back to its kind's list, and that back to all games.
   - *Daily challenge*: five countries, one of each quiz: find it on the globe, then its flag, its capital, its shape, and a country lit up on the globe (picked from four answers after the first). They're picked from the date, so everyone gets the same ones that day, and there's one go a day. The score is out of 7 (3, 2 or 1 for finding it, by try), shown as squares to share like Wordle's (🟩 right, 🟨/🟧 on a later try, 🟥 wrong), with "Copy result". It keeps your streak of days in a row, the longest, and how many you've played, and counts down to the next one.
   - *Find the country*: click the named country on the globe, with three tries (3, 2 or 1 points). Hard leaves out the 49 biggest countries.
@@ -177,7 +177,7 @@ npx playwright install chromium
 ## Tests
 
 - **Unit and component tests** (Vitest and Testing Library, in jsdom): the data, the game rules, the globe's layers against a real three.js camera, every panel, and the whole app with a stand-in for the WebGL globe. About 980 tests, covering over 99% of the lines.
-- **End-to-end tests** (Playwright): the real app with its WebGL globe in headless Chromium, on a desktop and a phone (touch, tab bar, sheets): hovering and clicking countries, visited places, states, cities and flights kept after reloading, the wishlist, a friend's link, the settings, a year in review and its time-lapse, a backup downloaded and restored, undoing a removal, the designs, every game, the screensaver and its preview (42 tests). In CI they run on the production build, with the service worker.
+- **End-to-end tests** (Playwright): the real app with its WebGL globe in headless Chromium, on a desktop and a phone (touch, tab bar, sheets): hovering and clicking countries, visited places, states, cities and flights kept after reloading, the wishlist, a friend's link, the settings, a year in review and its replay, a backup downloaded and restored, undoing a removal, the designs, every game, the screensaver and its preview (42 tests). In CI they run on the production build, with the service worker.
 
 `.github/workflows/tests.yml` runs all of it on GitHub for every pull request and every push to `main`: lint, the unit tests, the build (which type-checks), and the end-to-end tests. `.github/workflows/deploy.yml` then puts each push to `main` online (see Online).
 

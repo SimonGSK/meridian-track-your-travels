@@ -10,6 +10,8 @@ type Props = {
   count: number
   /** Replaying one trip: where it's got to ("Copenhagen → Dubai", "Japan"), rather than which trip of how many */
   step?: string | null
+  /** Replaying a year's trips: which */
+  year?: number | null
   paused: boolean
   speed: ReplaySpeed
   /** Pauses, or plays on */
@@ -23,10 +25,14 @@ type Props = {
  * At the bottom while trips are replayed: which trip of how many (or, for
  * one, where it's got to), when, and ways to pause, go faster, and stop
  */
-export default function ReplayBar({ trip, index, count, step, paused, speed, onPause, onSpeed, onStop }: Props) {
+export default function ReplayBar({ trip, index, count, step, year, paused, speed, onPause, onSpeed, onStop }: Props) {
   const one = step !== undefined
   return (
-    <div className="follow-bar replay-bar" role="status" aria-label={one ? 'Replaying a trip' : 'Replaying your trips'}>
+    <div
+      className="follow-bar replay-bar"
+      role="status"
+      aria-label={one ? 'Replaying a trip' : year ? `Replaying your ${year}` : 'Replaying your trips'}
+    >
       <span className="follow-text">
         {trip ? (
           <>
@@ -41,7 +47,7 @@ export default function ReplayBar({ trip, index, count, step, paused, speed, onP
             )}
           </>
         ) : (
-          <span>{one ? 'The trip, from the start' : 'Your trips, from the first'}</span>
+          <span>{one ? 'The trip, from the start' : year ? `Your ${year}, from the first trip` : 'Your trips, from the first'}</span>
         )}
       </span>
       <button type="button" className="icon-button small" onClick={onPause} aria-label={paused ? 'Play on' : 'Pause'}>

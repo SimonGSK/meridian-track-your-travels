@@ -3,7 +3,7 @@ import { countries } from '../countries'
 import type { Airport } from '../data/airports'
 import type { Route } from '../data/flights'
 import type { VisitDate } from '../data/visitDates'
-import { reviewOf, spotsOf, spotsOfStep, timelineOf, yearsOf, type Travels } from './yearInReview'
+import { reviewOf, spotsOf, yearsOf, type Travels } from './yearInReview'
 
 const airport = (code: string): Airport => ({ code, name: code, city: code, country: 'DK', lat: 0, lng: 0 })
 const route = (id: string, km: number, date?: VisitDate): Route => ({
@@ -113,47 +113,5 @@ describe('spotsOf', () => {
     const spots = spotsOf(reviewOf(2024, travels({ Japan: ['2024-04'] }, [route('NRT', 8700, '2024-04')])))
     expect(spots).toHaveLength(4) // Japan, and the flight's ends and middle
     expect(spots[0]).toEqual({ lat, lng, radius: japan.extent / 2 })
-  })
-})
-
-describe('timelineOf', () => {
-  const t = travels(
-    { Japan: ['2024-04'], France: ['2019-07', '2024'], Kenya: ['2021'], Greenland: ['2019-08'], Peru: [] },
-    [route('NRT', 8700, '2024-04'), route('CDG', 1000, '2019-07'), route('LHR', 950)],
-  )
-
-  it('goes through the years with dates, oldest first, adding each place in its first year', () => {
-    const steps = timelineOf(t)
-    expect(steps.map((s) => s.year)).toEqual([2019, 2021, 2024])
-    expect(steps.map((s) => [...s.names].sort())).toEqual([
-      ['France', 'Greenland'],
-      ['France', 'Greenland', 'Kenya'],
-      ['France', 'Greenland', 'Japan', 'Kenya'],
-    ])
-    expect(steps.map((s) => names(s.newPlaces))).toEqual([['France', 'Greenland'], ['Kenya'], ['Japan']]) // France came back, but isn't new
-    expect(steps.map((s) => names(s.revisits))).toEqual([[], [], ['France']])
-    expect(steps.map((s) => s.countryCount)).toEqual([2, 3, 4]) // Greenland counts as Denmark
-    expect(steps.map((s) => s.continents)).toEqual([2, 3, 4])
-  })
-
-  it('adds the dated flights year by year', () => {
-    const steps = timelineOf(t)
-    expect(steps.map((s) => s.flights.map((r) => r.flight.id))).toEqual([['CDG'], ['CDG'], ['NRT', 'CDG']])
-    expect(steps.map((s) => s.newFlights.map((r) => r.flight.id))).toEqual([['CDG'], [], ['NRT']])
-  })
-
-  it('keeps the places and flights of a year in view, those visited again too', () => {
-    const [first, , last] = timelineOf(t)
-    expect(spotsOfStep(first)).toHaveLength(2 + 3) // France and Greenland, and the flight's ends and middle
-    expect(spotsOfStep(last)).toHaveLength(2 + 3) // Japan, France again, and the flight
-  })
-
-  it('counts a place visited twice in a year as new that year, not again', () => {
-    const [step] = timelineOf(travels({ Italy: ['2014-03', '2014-09'] }))
-    expect([names(step.newPlaces), names(step.revisits)]).toEqual([['Italy'], []])
-  })
-
-  it('is empty without dates', () => {
-    expect(timelineOf(travels({ Peru: [] }, [route('LHR', 950)]))).toEqual([])
   })
 })
