@@ -22,6 +22,7 @@
     "data:time-zones": "node scripts/extract-time-zones.mjs",
     "data:currencies": "node scripts/fetch-currencies.mjs",
     "data:rates": "node scripts/fetch-rates.mjs",
+    "data:languages": "node scripts/fetch-languages.mjs",
     "data:map": "node scripts/extract-map.mjs",
     "data:airports": "node scripts/fetch-airports.mjs",
     "data:icons": "node scripts/make-icons.mjs",

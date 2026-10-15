@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CountryPanel from './CountryPanel'
 import { countries } from './countries'
@@ -94,6 +94,19 @@ describe('CountryPanel', () => {
       expect(screen.queryByText('Currency', { selector: 'dt' })).not.toBeInTheDocument()
       expect(screen.getByText('Local time', { selector: 'dt' })).toBeInTheDocument()
     })
+  })
+
+  it('names the languages spoken, the first few, and the rest when asked for', async () => {
+    show('Peru')
+    expect(fact('Languages')).toHaveTextContent(/^Spanish, Quechua$/)
+    show('Japan')
+    expect(screen.getAllByText('Language', { selector: 'dt' }).at(-1)!.nextElementSibling).toHaveTextContent(/^Japanese$/)
+    show('India')
+    const india = screen.getAllByText('Languages', { selector: 'dt' }).at(-1)!.nextElementSibling!
+    expect(india).toHaveTextContent(/^Hindi, English, Bangla, Telugu \+\d+ more$/)
+    await userEvent.click(within(india as HTMLElement).getByRole('button', { name: /more languages$/ }))
+    expect(india.textContent!.split(', ').length).toBeGreaterThan(10)
+    expect(within(india as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('shortens the biggest areas', () => {

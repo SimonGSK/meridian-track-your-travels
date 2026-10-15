@@ -1,6 +1,7 @@
-import type { ComponentProps } from 'react'
+import { useState, type ComponentProps } from 'react'
 import type { CountryFeature } from './countries'
 import { factsOf, formatArea, formatAreaShort, formatPopulation, formatPopulationShort } from './data/facts'
+import { languagesOf } from './data/languages'
 import { clockIn, comparedToYou, timeZonesOf, timesIn, utcOffset } from './data/localTime'
 import { currenciesOf, currencyName, exchange, formatSum, formatWorth, type Rates } from './data/money'
 import { useMinute } from './ui/useMinute'
@@ -92,6 +93,7 @@ function Facts({ country, facts, mapArea, money }: {
   const area = areaKm2 ?? Math.round(mapArea)
   const zones = timeZonesOf(country)
   const currencies = currenciesOf(country)
+  const languages = languagesOf(country)
   // Under the figures, side by side; one alone across
   const below = (zones.length > 0 ? 1 : 0) + (currencies.length > 0 && money ? 1 : 0)
   return (
@@ -116,6 +118,7 @@ function Facts({ country, facts, mapArea, money }: {
         </div>
         {zones.length > 0 && <LocalTime zones={zones} alone={below === 1} />}
         {currencies.length > 0 && money && <Currency currencies={currencies} money={money} alone={below === 1} />}
+        {languages.length > 0 && <Languages key={country.properties.name} names={languages} />}
       </dl>
       {note && <p className="facts-note">{note}</p>}
       <p className="facts-source">
@@ -166,3 +169,30 @@ function Currency({ currencies, money, alone }: { currencies: readonly string[];
     </div>
   )
 }
+
+/** How many languages show before "+ more" */
+export const SHOWN_LANGUAGES = 4
+
+/** The languages spoken there, the official ones first: the first few, and the rest when asked for */
+function Languages({ names }: { names: readonly string[] }) {
+  const [all, setAll] = useState(false)
+  const shown = all ? names : names.slice(0, SHOWN_LANGUAGES)
+  const more = names.length - shown.length
+  return (
+    <div className="fact fact-languages">
+      <dt>{names.length === 1 ? 'Language' : 'Languages'}</dt>
+      <dd>
+        {shown.join(', ')}
+        {more > 0 && (
+          <>
+            {' '}
+            <button type="button" className="link-button" onClick={() => setAll(true)} aria-label={`${more} more languages`}>
+              +{more} more
+            </button>
+          </>
+        )}
+      </dd>
+    </div>
+  )
+}
+
