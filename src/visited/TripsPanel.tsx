@@ -3,9 +3,9 @@ import { countries, searchCountries, type CountryFeature } from '../countries'
 import { cityOf, type Airport } from '../data/airports'
 import { flightStats, formatDistance, type Route } from '../data/flights'
 import { countdown, isToCome } from '../data/plans'
-import { countriesOfTrip, itemKey, placeFor, titleOf, type TripItem, type TripView, type Visit } from '../data/savedTrips'
+import { countriesOfTrip, itemKey, placeFor, titleOf, whenOf, type TripItem, type TripView, type Visit } from '../data/savedTrips'
 import { replayOfTrip } from '../data/replay'
-import { formatVisitDate, partsOf, type VisitDate } from '../data/visitDates'
+import { formatVisitDate, type VisitDate } from '../data/visitDates'
 import { CloseIcon, GripIcon, PencilIcon, PlaneIcon, PlayIcon, PlusIcon } from '../icons'
 import StatsBox from '../ui/StatsBox'
 import { noAutofill } from '../ui/noAutofill'
@@ -57,6 +57,8 @@ type Props = {
   onShowPlace: (country: CountryFeature) => void
   /** Replays one trip on the globe, by its id: its flights flown, each place colored as it's reached */
   onReplayTrip?: (id: string) => void
+  /** Shows a trip as a card, by its id, to save as a picture or share */
+  onShareTrip?: (id: string) => void
   /** Replays every trip been on, from the first, on the globe */
   onReplay?: () => void
 }
@@ -64,22 +66,13 @@ type Props = {
 const placeNamed = new Map(countries.map((c) => [c.properties.name, c]))
 const oneDecimal = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 })
 
-/** "Apr 2024", "Apr – May 2024", or "Dec 2024 – Jan 2025" */
-function whenOf(date: VisitDate | null, end: VisitDate | null) {
-  if (!date) return null
-  if (!end || end === date) return formatVisitDate(date)
-  const [from, to] = [partsOf(date), partsOf(end)]
-  const start = from.year === to.year && from.month && to.month ? formatVisitDate(date).split(' ')[0] : formatVisitDate(date)
-  return `${start} – ${formatVisitDate(end)}`
-}
-
 /**
  * The Visited tab's trips: what you've been to and flown, put together as you
  * went. Each trip is your visits and the flights between them, in order, and
  * a name; below them, what's in no trip yet, ready to date or put in one.
  */
 export default function TripsPanel(props: Props) {
-  const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onReplayTrip, onReplay } = props
+  const { trips, loose, routes, flown, airports, actions, open, onOpen, onShowTrip, onShowRoute, onShowPlace, onReplayTrip, onShareTrip, onReplay } = props
   const [naming, setNaming] = useState<string | null>(null)
   const { flights, km, aroundEarth } = flightStats(flown)
   const looseCount = loose.places.length + loose.flights.length
@@ -156,6 +149,7 @@ export default function TripsPanel(props: Props) {
               onShowRoute={onShowRoute}
               onShowPlace={onShowPlace}
               onReplay={onReplayTrip && replayOfTrip(view).steps.length > 0 ? () => onReplayTrip(view.trip.id) : undefined}
+              onShare={onShareTrip && (() => onShareTrip(view.trip.id))}
             />
           ))}
         </ul>
@@ -230,10 +224,12 @@ type CardProps = {
   onShowPlace: (country: CountryFeature) => void
   /** Replays it on the globe, if there's anything of it been yet */
   onReplay?: () => void
+  /** Shows it as a card, to save or share */
+  onShare?: () => void
 }
 
 /** A trip: its name and when, and opened, its places and flights in order, to rearrange, date and add to */
-function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onReplay }: CardProps) {
+function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, onNaming, onShow, onShowRoute, onShowPlace, onReplay, onShare }: CardProps) {
   const { trip, items, date, endDate } = view
   const [adding, setAdding] = useState<'place' | 'flight' | null>(null)
   const title = titleOf(view)
@@ -441,6 +437,11 @@ function TripCard({ view, routes, airports, actions, isOpen, onToggle, naming, o
             {items.length > 0 && (
               <button type="button" className="link-button" onClick={onShow}>
                 Show on globe
+              </button>
+            )}
+            {items.length > 0 && onShare && (
+              <button type="button" className="link-button" onClick={onShare}>
+                Share trip
               </button>
             )}
             <button type="button" className="link-button muted-action" onClick={() => actions.remove(trip.id)}>

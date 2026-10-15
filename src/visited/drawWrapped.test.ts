@@ -1,41 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { countries } from '../countries'
 import { MIDNIGHT } from '../globe/themes'
+import { recording } from '../test/recordingCanvas'
 import { CARD_HEIGHT, CARD_WIDTH, drawWrapped } from './drawWrapped'
 import type { Wrapped } from './wrapped'
-
-/** A stand-in 2D canvas that keeps what text and pictures it was asked to draw, and ignores the rest */
-function recording() {
-  const texts: { text: string; font: string; fill: string }[] = []
-  const images: unknown[] = []
-  /** The color of each shape filled */
-  const fills: string[] = []
-  const gradient = { addColorStop() {} }
-  const target: Record<string | symbol, unknown> = {
-    font: '',
-    fillStyle: '',
-    strokeStyle: '',
-    fillText(this: { font: string; fillStyle: unknown }, text: string) {
-      texts.push({ text, font: this.font, fill: String(this.fillStyle) })
-    },
-    drawImage(image: unknown) {
-      images.push(image)
-    },
-    fill(this: { fillStyle: unknown }) {
-      fills.push(String(this.fillStyle))
-    },
-    createLinearGradient: () => gradient,
-    createRadialGradient: () => gradient,
-  }
-  const context = new Proxy(target, {
-    get: (t, key) => (key in t ? t[key] : () => {}),
-    set: (t, key, value) => {
-      t[key] = value
-      return true
-    },
-  }) as unknown as CanvasRenderingContext2D
-  return { context, texts, images, fills }
-}
 
 const byName = (name: string) => countries.find((c) => c.properties.name === name)!
 const year: Wrapped = {

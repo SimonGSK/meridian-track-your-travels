@@ -64,6 +64,7 @@ function setup(trips: SavedTrip[] = TRIPS) {
     onShowRoute: vi.fn(),
     onShowPlace: vi.fn(),
     onReplayTrip: vi.fn(),
+    onShareTrip: vi.fn(),
     onReplay: vi.fn(),
   }
   render(<Panel {...props} />)
@@ -268,5 +269,14 @@ describe('TripsPanel', () => {
     expect(onShowTrip).toHaveBeenCalledWith(asiaOf(views))
     await userEvent.click(screen.getByRole('button', { name: 'Remove trip' }))
     expect(actions.remove).toHaveBeenCalledWith('asia')
+  })
+
+  it('shares a trip as a card, once there is something in it', async () => {
+    const { onShareTrip } = setup()
+    await open(/Nothing in it yet/)
+    expect(screen.queryByRole('button', { name: 'Share trip' })).not.toBeInTheDocument()
+    await open(/Spring in Asia/)
+    await userEvent.click(screen.getByRole('button', { name: 'Share trip' }))
+    expect(onShareTrip).toHaveBeenCalledWith('asia')
   })
 })

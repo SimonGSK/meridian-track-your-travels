@@ -778,6 +778,30 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('tab', { name: 'Years' }))
       expect(screen.getByRole('button', { name: /^Denmark/ })).toHaveTextContent('DenmarkFirst visit · Roskilde Festival')
     })
+    it('shows a trip as a card full screen, with what was new on it, put away with Escape', async () => {
+      const nextYear = new Date().getFullYear() + 1
+      withTrips(
+        { items: [['Denmark', '2017'], ['Sweden', '2017']] },
+        { name: 'Midsummer', items: [['Denmark', '2019-06'], ['Norway', '2019-06']] },
+        { items: [['Norway', `${nextYear}-03`], ['Peru', `${nextYear}-03`]] },
+      )
+      render(<App />)
+      await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
+      await userEvent.click(screen.getByRole('tab', { name: 'Trips' }))
+      await openTrip(/Midsummer/)
+      await userEvent.click(screen.getByRole('button', { name: 'Share trip' }))
+      const card = screen.getByRole('dialog', { name: 'Your trip: Midsummer' })
+      // Denmark been to in 2017, Norway new
+      expect(within(card).getByRole('img')).toHaveAccessibleName('Midsummer, Jun 2019: 2 countries, 1 new place.')
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(card).not.toBeInTheDocument()
+      expect(sidePanel()).toBeInTheDocument() // Escape put the card away, not the panel
+
+      // A trip to come: Norway been to, Peru not yet, so new
+      await openTrip(/Peru/)
+      await userEvent.click(screen.getByRole('button', { name: 'Share trip' }))
+      expect(screen.getByRole('img', { name: `Norway & Peru, Mar ${nextYear}: 2 countries, 1 new place.` })).toBeInTheDocument()
+    })
 
     it('moves dates and plans saved before trips into trips: with a flight landing there, or a trip a month', async () => {
       const saved = (key: string) => JSON.parse(localStorage.getItem(`countries-app.${key}`) ?? 'null')
