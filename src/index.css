@@ -3199,34 +3199,10 @@ code {
   margin-bottom: 12px;
 }
 
-/* The time-lapse */
-.lapse-play {
+/* Replaying the year's trips */
+.year-replay {
   width: 100%;
   margin-bottom: 12px;
-}
-
-.lapse .year-heading {
-  margin: 4px 0 10px;
-  text-align: center;
-}
-
-.lapse .progress {
-  margin-bottom: 14px;
-}
-
-.lapse-place {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 8px;
-}
-
-.lapse-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 16px;
 }
 
 /* Achievements, in the Visited tab */
