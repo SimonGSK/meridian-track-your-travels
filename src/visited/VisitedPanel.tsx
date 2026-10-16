@@ -4,6 +4,7 @@ import { countries, searchCountries, type CountryFeature } from '../countries'
 import { CONTINENTS, type Continent } from '../data/continents'
 import { flagUrl } from '../flags'
 import { CheckIcon, CloseIcon, StarIcon } from '../icons'
+import { worldShareOf } from '../data/facts'
 import { countriesOf, countryOfPlace, territoriesOf } from '../data/sovereigns'
 import { percentLabel } from './percentLabel'
 import StatsBox from '../ui/StatsBox'
@@ -79,6 +80,8 @@ export default function VisitedPanel(props: Props) {
   /** Countries been to only in a territory of theirs, like Denmark in Greenland */
   const throughTerritory = (country: CountryFeature) => !isVisited(country)
   const wishes = countries.filter((c) => wishlist.has(c.properties.name)).sort(byName)
+  // The places been to are home to this much of the world's people, and cover this much of its land
+  const share = worldShareOf(visitedList)
   // A second line under the name: "Territory" for one that's no country's, and states and cities visited; "In Greenland" for Denmark been to there
   const noteFor = (c: CountryFeature) =>
     throughTerritory(c)
@@ -112,6 +115,11 @@ export default function VisitedPanel(props: Props) {
         <div style={{ width: `${(visitedCountries / COUNTRY_COUNT) * 100}%` }} />
       </div>
       <span className="visited-percent">{percentLabel(visitedCountries, COUNTRY_COUNT)} of the world's countries</span>
+      {visitedList.length > 0 && (
+        <span className="visited-percent world-share">
+          Home to {percentLabel(share.people, 1)} of its people, on {percentLabel(share.land, 1)} of its land
+        </span>
+      )}
 
       <h3>By continent</h3>
       <ul className="continent-stats" aria-label="Countries visited by continent">

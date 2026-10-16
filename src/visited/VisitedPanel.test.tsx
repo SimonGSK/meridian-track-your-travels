@@ -38,6 +38,14 @@ describe('VisitedPanel', () => {
     )
   })
 
+  it("says how much of the world's people live in the places been to, and how much of its land they are, once there are any", () => {
+    setup(['China', 'Greenland'])
+    expect(screen.getByText(/^Home to/)).toHaveTextContent("Home to 17% of its people, on 8% of its land")
+    cleanup()
+    setup()
+    expect(screen.queryByText(/^Home to/)).not.toBeInTheDocument()
+  })
+
   it('counts the cities visited', () => {
     render(<VisitedPanel visited={new Set(['Denmark'])} onAdd={() => {}} onRemove={() => {}} onShow={() => {}} cityCount={3} />)
     expect(stat('Cities')).toHaveTextContent('3')

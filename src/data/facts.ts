@@ -1,4 +1,4 @@
-import type { CountryFeature } from '../countries'
+import { countries, type CountryFeature } from '../countries'
 import rawFacts from './country-facts.json'
 import { sharesCode } from './names'
 
@@ -27,6 +27,31 @@ export function placeKey(country: CountryFeature) {
 
 export function factsOf(country: CountryFeature): CountryFacts | null {
   return facts[placeKey(country)] ?? null
+}
+
+/**
+ * A place's people, and its land: as big as it is on the map, which measures
+ * every place alike, where the World Bank counts only Greenland's land free
+ * of ice, a fifth of it
+ */
+const sizeOf = (place: CountryFeature) => ({ people: factsOf(place)?.population ?? 0, land: place.properties.areaKm2 })
+
+/** Everyone, and all the land, in every place on the map, Antarctica too */
+const WORLD = countries.map(sizeOf).reduce((world, size) => ({ people: world.people + size.people, land: world.land + size.land }))
+
+/**
+ * The share of the world's people who live in these places, and of its land
+ * they cover, from 0 to 1. Each place counts for itself: Greenland's people
+ * and land are Greenland's, not Denmark's.
+ */
+export function worldShareOf(places: Iterable<CountryFeature>) {
+  let [people, land] = [0, 0]
+  for (const place of new Set(places)) {
+    const size = sizeOf(place)
+    people += size.people
+    land += size.land
+  }
+  return { people: people / WORLD.people, land: land / WORLD.land }
 }
 
 const whole = new Intl.NumberFormat('en-US')
