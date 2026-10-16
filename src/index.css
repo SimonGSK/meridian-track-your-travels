@@ -2045,6 +2045,11 @@ code {
   font-size: 12px;
 }
 
+/* Under the countries' share, as a second line of it */
+.visited-percent.world-share {
+  margin-top: 2px;
+}
+
 .continent-stats {
   display: grid;
   gap: 12px;

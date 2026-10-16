@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { countries } from '../countries'
-import { factsOf, formatArea, formatAreaShort, formatPopulation, formatPopulationShort } from './facts'
+import { factsOf, formatArea, formatAreaShort, formatPopulation, formatPopulationShort, worldShareOf } from './facts'
 
 const byName = (name: string) => countries.find((c) => c.properties.name === name)!
 
@@ -38,6 +38,29 @@ describe('factsOf', () => {
   it('notes the places shown as part of a country', () => {
     expect(factsOf(byName('Somalia'))!.note).toMatch(/^Includes Somaliland, .* since 1991/)
     expect(factsOf(byName('Cyprus'))!.note).toMatch(/^Includes Northern Cyprus/)
+  })
+})
+
+describe('worldShareOf', () => {
+  it("is the share of the world's people living in the places, and of its land they cover", () => {
+    expect(worldShareOf([])).toEqual({ people: 0, land: 0 })
+    expect(worldShareOf(countries).people).toBeCloseTo(1)
+    expect(worldShareOf(countries).land).toBeCloseTo(1)
+    // Over a third of everyone, on under a tenth of the land
+    const { people, land } = worldShareOf([byName('China'), byName('India')])
+    expect(people).toBeGreaterThan(0.34)
+    expect(people).toBeLessThan(0.37)
+    expect(land).toBeGreaterThan(0.08)
+    expect(land).toBeLessThan(0.09)
+  })
+
+  it('counts each place for itself, and once', () => {
+    // Greenland is Greenland's land, not Denmark's: much land, ice and all, and few people
+    const greenland = worldShareOf([byName('Greenland'), byName('Greenland')])
+    expect(greenland.land).toBeGreaterThan(0.014)
+    expect(greenland.land).toBeLessThan(0.016)
+    expect(greenland.people).toBeLessThan(0.00001)
+    expect(worldShareOf([byName('Denmark')]).land).toBeLessThan(0.001)
   })
 })
 
