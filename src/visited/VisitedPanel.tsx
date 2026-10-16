@@ -25,6 +25,8 @@ type Props = {
   wishlist?: ReadonlySet<string>
   onWish?: (name: string) => void
   onUnwish?: (name: string) => void
+  /** Shows your atlas as a poster, to save as a picture or share */
+  onPoster?: () => void
 }
 
 const byName = (a: CountryFeature, b: CountryFeature) => a.properties.name.localeCompare(b.properties.name)
@@ -62,7 +64,7 @@ const listOf = (names: string[]) => (names.length < 2 ? names.join('') : `${name
 const NO_WISHES: ReadonlySet<string> = new Set()
 
 export default function VisitedPanel(props: Props) {
-  const { visited, onAdd, onRemove, onShow, note, cityCount = 0, inTrips = NO_WISHES, wishlist = NO_WISHES, onWish, onUnwish } = props
+  const { visited, onAdd, onRemove, onShow, note, cityCount = 0, inTrips = NO_WISHES, wishlist = NO_WISHES, onWish, onUnwish, onPoster } = props
   const [query, setQuery] = useState('')
   /** The continent whose places are listed, over the rest */
   const [open, setOpen] = useState<Continent | null>(null)
@@ -119,6 +121,11 @@ export default function VisitedPanel(props: Props) {
         <span className="visited-percent world-share">
           Home to {percentLabel(share.people, 1)} of its people, on {percentLabel(share.land, 1)} of its land
         </span>
+      )}
+      {visitedList.length > 0 && onPoster && (
+        <button type="button" className="link-button atlas-poster" onClick={onPoster}>
+          ✨ Your atlas as a poster
+        </button>
       )}
 
       <h3>By continent</h3>
