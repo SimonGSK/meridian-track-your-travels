@@ -2050,6 +2050,11 @@ code {
   margin-top: 2px;
 }
 
+.atlas-poster {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
 .continent-stats {
   display: grid;
   gap: 12px;

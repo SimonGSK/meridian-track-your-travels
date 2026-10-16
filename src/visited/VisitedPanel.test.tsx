@@ -46,6 +46,15 @@ describe('VisitedPanel', () => {
     expect(screen.queryByText(/^Home to/)).not.toBeInTheDocument()
   })
 
+  it('makes your atlas a poster, once there is anything in it', async () => {
+    const onPoster = vi.fn()
+    const { rerender } = render(<VisitedPanel visited={new Set()} onAdd={() => {}} onRemove={() => {}} onShow={() => {}} onPoster={onPoster} />)
+    expect(screen.queryByRole('button', { name: '✨ Your atlas as a poster' })).not.toBeInTheDocument()
+    rerender(<VisitedPanel visited={new Set(['Peru'])} onAdd={() => {}} onRemove={() => {}} onShow={() => {}} onPoster={onPoster} />)
+    await userEvent.click(screen.getByRole('button', { name: '✨ Your atlas as a poster' }))
+    expect(onPoster).toHaveBeenCalledOnce()
+  })
+
   it('counts the cities visited', () => {
     render(<VisitedPanel visited={new Set(['Denmark'])} onAdd={() => {}} onRemove={() => {}} onShow={() => {}} cityCount={3} />)
     expect(stat('Cities')).toHaveTextContent('3')

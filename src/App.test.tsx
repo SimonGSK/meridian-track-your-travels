@@ -778,6 +778,20 @@ describe('App', () => {
       await userEvent.click(screen.getByRole('tab', { name: 'Years' }))
       expect(screen.getByRole('button', { name: /^Denmark/ })).toHaveTextContent('DenmarkFirst visit · Roskilde Festival')
     })
+    it('makes your atlas a poster full screen, put away with Escape', async () => {
+      withTrips({ items: [['Denmark', '2019-06'], ['Greenland', '2019-07']] })
+      render(<App />)
+      await userEvent.click(screen.getByRole('button', { name: 'Visited' }))
+      expect(screen.getByText(/^Home to/)).toHaveTextContent(/^Home to <1% of its people, on [12]% of its land$/)
+      await userEvent.click(screen.getByRole('button', { name: '✨ Your atlas as a poster' }))
+      const poster = screen.getByRole('dialog', { name: 'Your atlas' })
+      expect(within(poster).getByRole('img')).toHaveAccessibleName(
+        expect.stringMatching(/^Your atlas: 1 of 197 countries, 1 territory, on 2 continents\. Home to <1% of the world's people/),
+      )
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(poster).not.toBeInTheDocument()
+      expect(sidePanel()).toBeInTheDocument() // Escape put the poster away, not the panel
+    })
     it('shows a trip as a card full screen, with what was new on it, put away with Escape', async () => {
       const nextYear = new Date().getFullYear() + 1
       withTrips(

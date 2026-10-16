@@ -82,6 +82,8 @@ import { useTrips, newId } from './visited/useTrips'
 import VisitedTab, { type VisitedView } from './visited/VisitedTab'
 import YearsPanel from './visited/YearsPanel'
 import TripCardView from './visited/TripCardView'
+import AtlasPosterView from './visited/AtlasPosterView'
+import { atlasPosterOf } from './visited/atlasPoster'
 import WrappedView from './visited/WrappedView'
 import { reviewOf, spotsOf, yearsOf, type YearReview } from './visited/yearInReview'
 import { EARTH_KM, distanceKm, routeOf, uniqueRoutes, type Route } from './data/flights'
@@ -537,6 +539,12 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
 
   // A year wrapped: its card full screen, to keep or share
   const [wrapping, setWrapping] = useState(false)
+  // Your atlas, all of it, as a poster, the same way (from the atlas)
+  const [postering, setPostering] = useState(false)
+  const poster = useMemo(
+    () => (postering ? atlasPosterOf({ visited, cities: visitedCityList.length, flown: routes, trips: tripsTaken.length, years }) : null),
+    [postering, visited, visitedCityList, routes, tripsTaken, years],
+  )
   // A trip as a card, the same way, by its id (from its card in the Trips list)
   const [sharingTrip, setSharingTrip] = useState<string | null>(null)
   const sharedTrip = useMemo(() => tripViews.find((view) => view.trip.id === sharingTrip) ?? null, [tripViews, sharingTrip])
@@ -1088,6 +1096,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       // The preview's own Escape leaves it, back to the panels as they were
       if (e.key !== 'Escape' || previewing) return
       if (sharingTrip) setSharingTrip(null)
+      else if (postering) setPostering(false)
       else if (wrapping) setWrapping(false)
       else if (replay) setReplay(null)
       else if (selected) selectCountry(null)
@@ -1101,7 +1110,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [sharingTrip, wrapping, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
+  }, [sharingTrip, postering, wrapping, replay, selected, shownRoutes, selectCountry, quitGame, previewing])
 
   /** The screensaver's preview, from Settings: nothing picked, from the screensaver's view */
   const startPreview = () => {
@@ -1291,7 +1300,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                     if (cityCount > 0) notes.push(citiesLabel(cityCount))
                     return notes.filter(Boolean).join(' · ') || null
                   }}
-                  cityCount={cities ? cities.filter((c) => visitedCities.has(c.id)).length : 0}
+                  cityCount={visitedCityList.length}
+                  onPoster={() => setPostering(true)}
                 />
               }
               yearsPanel={
@@ -1395,6 +1405,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       />
       <FlagCorner country={playing ? null : hovered} />
       {wrapping && review && <WrappedView review={review} onClose={() => setWrapping(false)} />}
+      {poster && <AtlasPosterView poster={poster} onClose={() => setPostering(false)} />}
       {sharedTrip && <TripCardView view={sharedTrip} firstVisitOf={firstVisitOf} onClose={() => setSharingTrip(null)} />}
 
       {/* Notes at the bottom, one over the other */}

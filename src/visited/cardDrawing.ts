@@ -171,46 +171,68 @@ export function drawGlobe(
   ctx.restore()
 }
 
-/** Flags: up to this many a row, and rows */
-const FLAGS_A_ROW = 6
-const FLAG_ROWS = 3
-const FLAG = { width: 132, height: 99, gap: 20 }
+/** Rows of flags: how many a row, and rows at most, how wide each is (and three quarters as high), and the gap between */
+export type FlagRows = { aRow: number; rows: number; width: number; gap: number }
+
+/** Up to 18 flags, big: the cards of a year or a trip */
+const FLAG_ROWS: FlagRows = { aRow: 6, rows: 3, width: 132, gap: 20 }
+
+/**
+ * Rows for `count` flags in a room `width` by `height`: as big as all of
+ * them fit, from `largest` wide down to `smallest`; at the smallest, as many
+ * as fit, the rest as "+N".
+ */
+export function flagRowsFor(count: number, width: number, height: number, [largest, smallest]: [number, number]): FlagRows {
+  let layout = FLAG_ROWS
+  for (let flag = largest; flag >= smallest; flag -= 2) {
+    const gap = Math.round(flag * 0.15)
+    const aRow = Math.floor((width + gap) / (flag + gap))
+    const rows = Math.floor((height + gap) / (flag * 0.75 + gap))
+    layout = { aRow, rows, width: flag, gap }
+    if (aRow * rows >= count) break
+  }
+  return layout
+}
 
 /** Places' flags, new ones ringed in green, in rows in the middle of the room below `area`; more than fit end in "+12" */
-export function drawFlags(ctx: Ctx, places: readonly CardPlace[], flags: ReadonlyMap<CountryFeature, CanvasImageSource>, area: number, rowsAtMost = FLAG_ROWS) {
-  const room = FLAGS_A_ROW * rowsAtMost
+export function drawFlags(ctx: Ctx, places: readonly CardPlace[], flags: ReadonlyMap<CountryFeature, CanvasImageSource>, area: number, layout = FLAG_ROWS) {
+  const { aRow, rows: rowsAtMost, width, gap } = layout
+  const height = width * 0.75
+  const corner = Math.round(width / 13)
+  const room = aRow * rowsAtMost
   const shown = places.length > room ? places.slice(0, room - 1) : places
   const more = places.length - shown.length
   const tiles = shown.length + (more ? 1 : 0)
-  const rows = Math.ceil(tiles / FLAGS_A_ROW)
-  const roomHeight = rowsAtMost * FLAG.height + (rowsAtMost - 1) * FLAG.gap
-  const top = area + (roomHeight - (rows * FLAG.height + Math.max(rows - 1, 0) * FLAG.gap)) / 2
+  const rows = Math.ceil(tiles / aRow)
+  const roomHeight = rowsAtMost * height + (rowsAtMost - 1) * gap
+  const top = area + (roomHeight - (rows * height + Math.max(rows - 1, 0) * gap)) / 2
   for (let i = 0; i < tiles; i++) {
-    const row = Math.floor(i / FLAGS_A_ROW)
-    const inRow = Math.min(FLAGS_A_ROW, tiles - row * FLAGS_A_ROW)
-    const rowWidth = inRow * FLAG.width + (inRow - 1) * FLAG.gap
-    const x = (CARD_WIDTH - rowWidth) / 2 + (i % FLAGS_A_ROW) * (FLAG.width + FLAG.gap)
-    const y = top + row * (FLAG.height + FLAG.gap)
+    const row = Math.floor(i / aRow)
+    const inRow = Math.min(aRow, tiles - row * aRow)
+    const rowWidth = inRow * width + (inRow - 1) * gap
+    const x = (CARD_WIDTH - rowWidth) / 2 + (i % aRow) * (width + gap)
+    const y = top + row * (height + gap)
     const place = shown[i]
     if (!place) {
-      roundedRect(ctx, x, y, FLAG.width, FLAG.height, 10)
+      roundedRect(ctx, x, y, width, height, corner)
       ctx.fillStyle = COLORS.land
       ctx.fill()
       ctx.textAlign = 'center'
-      text(ctx, `+${more}`, x + FLAG.width / 2, y + FLAG.height / 2 + 14, `600 40px ${SANS}`, COLORS.cream)
+      const size = Math.round(width * 0.3)
+      text(ctx, `+${more}`, x + width / 2, y + height / 2 + size * 0.35, `600 ${size}px ${SANS}`, COLORS.cream)
       continue
     }
     const image = flags.get(place.country)
     ctx.save()
-    roundedRect(ctx, x, y, FLAG.width, FLAG.height, 10)
+    roundedRect(ctx, x, y, width, height, corner)
     ctx.clip()
-    if (image) ctx.drawImage(image, x, y, FLAG.width, FLAG.height)
+    if (image) ctx.drawImage(image, x, y, width, height)
     else {
       ctx.fillStyle = COLORS.land
-      ctx.fillRect(x, y, FLAG.width, FLAG.height)
+      ctx.fillRect(x, y, width, height)
     }
     ctx.restore()
-    roundedRect(ctx, x, y, FLAG.width, FLAG.height, 10)
+    roundedRect(ctx, x, y, width, height, corner)
     ctx.lineWidth = place.isNew ? 6 : 2
     ctx.strokeStyle = place.isNew ? COLORS.newPlace : 'rgba(255, 255, 255, 0.18)'
     ctx.stroke()
