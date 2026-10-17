@@ -614,7 +614,7 @@ describe('App', () => {
       })
       afterEach(() => vi.useRealTimers())
 
-      it('every so often, between spins: from nothing, each place as it is reached, then everything again', async () => {
+      it('every so often: from nothing, each place as it is reached, then everything again, the globe spinning on all the while', async () => {
         render(<App />)
         await act(async () => {})
         const all = { Denmark: DEFAULT_THEME.visited, Sweden: DEFAULT_THEME.visited, Japan: DEFAULT_THEME.visited }
@@ -622,17 +622,20 @@ describe('App', () => {
         play(SCREENSAVER_FIRST_REPLAY_MS)
         expect(painted()).toEqual({})
         // Each place colored as it's reached, in its turn, those of the trip it's on standing out
+        globe.pointOfView.mockClear()
         play(REPLAY_LEAD_IN * 1000)
         expect(painted()).toEqual({ Denmark: DEFAULT_THEME.correct })
         play(REPLAY_PAUSE * 1000)
         expect(painted()).toEqual({ Denmark: DEFAULT_THEME.correct, Sweden: DEFAULT_THEME.correct })
         play((REPLAY_PAUSE + REPLAY_GAP) * 1000)
         expect(painted()).toEqual({ Denmark: DEFAULT_THEME.visited, Sweden: DEFAULT_THEME.visited, Japan: DEFAULT_THEME.correct })
-        // Then everything again, the globe turned back to the screensaver's view, spinning, until the next
-        globe.pointOfView.mockClear()
+        // The globe never turned to any of them: it spins on as it was
+        expect(globe.controls().autoRotate).toBe(true)
+        // Then everything again, still spinning, until the next
         play(3_000)
         expect(painted()).toEqual(all)
-        expect(globe.pointOfView).toHaveBeenCalledWith(expect.objectContaining({ lat: SCREENSAVER_VIEW.lat, altitude: SCREENSAVER_VIEW.altitude }), 2000)
+        expect(globe.pointOfView.mock.calls.filter((call) => call.length > 0)).toEqual([])
+        expect(globe.controls().autoRotate).toBe(true)
         play(SCREENSAVER_REPLAY_EVERY_MS - 1)
         expect(painted()).toEqual(all)
         play(1)

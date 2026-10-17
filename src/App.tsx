@@ -159,10 +159,11 @@ const RELIEF = 40
 const NO_FLIGHTS = { lines: [], journeys: [] }
 
 /**
- * Trips replayed: all, a year's (from the Years view), or one (from its card), on the replay's own clock, and whether
- * the panel made way for it
+ * Trips replayed: all, a year's (from the Years view), or one (from its card), on the replay's own clock, whether
+ * the panel made way for it, and whether the globe spins on as it was (`spins`, the screensaver's) rather than
+ * turning to each flight and place
  */
-type Replaying = ReturnType<typeof replayOf> & { clock: ReplayClock; reopen: boolean; one: boolean; year: number | null }
+type Replaying = ReturnType<typeof replayOf> & { clock: ReplayClock; reopen: boolean; one: boolean; year: number | null; spins: boolean }
 
 
 /** Phones show one panel at a time, as a sheet over the globe */
@@ -566,9 +567,9 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   const [replaySpeed, setReplaySpeed] = useState<ReplaySpeed>(1)
   const canReplay = useMemo(() => replayOf(tripViews).steps.length > 0, [tripViews])
   const playReplay = useCallback(
-    (played: ReturnType<typeof replayOf>, { reopen = false, one = false, year = null as number | null } = {}) => {
+    (played: ReturnType<typeof replayOf>, { reopen = false, one = false, year = null as number | null, spins = false } = {}) => {
       setReplayAt(-1)
-      setReplay({ ...played, clock: startClock(performance.now() / 1000, replaySpeed), reopen, one, year })
+      setReplay({ ...played, clock: startClock(performance.now() / 1000, replaySpeed), reopen, one, year, spins })
     },
     [replaySpeed],
   )
@@ -625,7 +626,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
         : [
             setTimeout(() => {
               setReplayAt(i)
-              // The globe turns to each flight, and to each place not just landed in
+              // The globe turns to each flight, and to each place not just landed in, unless it spins on
+              if (replay.spins) return
               const before = steps[i - 1]
               if (step.kind === 'flight') flyToSee(spotsOfRoute(step.route))
               else if (before?.kind !== 'flight' || countryOf(before.route.to) !== step.place) flyToSee(spotsOfPlaces([step.place]))
@@ -646,19 +648,19 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
       ? `${cityOf(replayStep.route.from)} → ${cityOf(replayStep.route.to)}`
       : replayStep.place
     : null
-  // As a screensaver (or its preview), your trips replayed every so often, between spins, if switched on with the
-  // flights: first soon, then after a good while of spinning, the globe turned back to the screensaver's view
+  // As a screensaver (or its preview), your trips replayed every so often, if switched on with the flights: first
+  // soon, then after a good while with everything shown. The globe spins on all the while, as the places and
+  // flights come back in their turn
   const replaysAsScreensaver =
     (screensaver || previewing) && !!globe && settings.showFlights && settings.showScreensaverReplay && canReplay
   const replayedAsScreensaver = useRef(false)
   useEffect(() => {
     if (!replaysAsScreensaver || replay) return
     const again = replayedAsScreensaver.current
-    if (again) globe.pointOfView({ ...SCREENSAVER_VIEW, lng: globe.pointOfView().lng }, 2000)
     const timer = setTimeout(
       () => {
         replayedAsScreensaver.current = true
-        playReplay(replayOf(tripViews))
+        playReplay(replayOf(tripViews), { spins: true })
       },
       again ? SCREENSAVER_REPLAY_EVERY_MS : SCREENSAVER_FIRST_REPLAY_MS,
     )
@@ -971,7 +973,7 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
   useDepthPrecision(globe)
   // Not while a year is shown either: it turned to that year's places
   // The preview spins at once, as the real screensaver does
-  useSmoothAutoRotate(globe, !selected && !playing && !shownRoutes && !yearShown && !replay, previewing)
+  useSmoothAutoRotate(globe, !selected && !playing && !shownRoutes && !yearShown && (!replay || replay.spins), previewing)
 
   const onGlobeClick = useCallback(
     (country: CountryFeature | null, position: LatLng | null, point: Point) => {
