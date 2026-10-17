@@ -1,5 +1,6 @@
 import { useId, type ComponentProps, type ReactNode } from 'react'
 import ScreensaverCard from '../design/ScreensaverCard'
+import type { Settings } from '../explore/useSettings'
 import { ChevronIcon, DownloadIcon, MoneyIcon, MonitorIcon, PeopleIcon, PhoneIcon, TrophyIcon } from '../icons'
 import { useInstall } from '../pwa/install'
 import AppCard from '../settings/AppCard'
@@ -22,6 +23,9 @@ type Props = {
   compare: ReactNode
   /** Shows the screensaver in the app, to have a look */
   onPreview: () => void
+  /** The settings, for the screensaver's: whether it replays your timeline */
+  settings: Settings
+  onSettingsChange: (changes: Partial<Settings>) => void
   /** Your currency: chosen, or automatic from where you are, and the rates */
   currency: Omit<ComponentProps<typeof CurrencyCard>, 'back'>
 }
@@ -31,7 +35,7 @@ type Props = {
  * settings, each a small card opening to all of it, with a way back
  */
 export default function MorePanel(props: Props) {
-  const { open, onOpen, earned, achievementCount, achievements, friend, compare, onPreview, currency } = props
+  const { open, onOpen, earned, achievementCount, achievements, friend, compare, onPreview, settings, onSettingsChange, currency } = props
   const { installed } = useInstall()
 
   const back = (
@@ -58,7 +62,7 @@ export default function MorePanel(props: Props) {
   if (open === 'currency') return <CurrencyCard {...currency} back={back} />
   if (open === 'backup') return <BackupCard back={back} />
   if (open === 'app') return <AppCard back={back} />
-  if (open === 'screensaver') return <ScreensaverCard onPreview={onPreview} back={back} />
+  if (open === 'screensaver') return <ScreensaverCard onPreview={onPreview} settings={settings} onChange={onSettingsChange} back={back} />
 
   return (
     <>

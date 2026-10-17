@@ -1365,6 +1365,8 @@ export default function App({ compareOnOpen = false }: { compareOnOpen?: boolean
                   />
                 }
                 onPreview={startPreview}
+                settings={settings}
+                onSettingsChange={changeSettings}
                 currency={{ chosen: homeCurrency.chosen, guess: homeCurrency.guess, onChoose: homeCurrency.choose, rates }}
               />
             </>

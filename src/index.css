@@ -3170,6 +3170,29 @@ code {
   margin: 4px 0 6px;
 }
 
+/* The screensaver's own switch: replaying your timeline, as a triangle played */
+.screensaver-replay {
+  margin-top: 10px;
+}
+
+.screensaver-replay:disabled {
+  cursor: default;
+}
+
+.screensaver-replay:disabled:hover {
+  background: none;
+}
+
+.replay-dot {
+  border-radius: 0;
+  background: var(--blue);
+  clip-path: polygon(15% 0, 100% 50%, 15% 100%);
+}
+
+.screensaver-replay-note {
+  margin: 2px 0 0 6px;
+}
+
 /* A year, wrapped: its card full screen, over everything, with Share, Save and Close under it */
 .wrapped {
   position: fixed;
