@@ -35,11 +35,14 @@ const KEYS = [
 
 export const isScreensaver = (search = window.location.search) => new URLSearchParams(search).has('screensaver')
 
-/** Your saved places, design and layers, packed for an address */
-export function packPlaces(storage: Storage = localStorage) {
+/**
+ * Your saved places, design and layers, packed for an address; `newer` is
+ * any of them as they are now, before they're saved (just after a change)
+ */
+export function packPlaces(storage: Storage = localStorage, newer: Record<string, string> = {}) {
   const saved: Record<string, string> = {}
   for (const key of KEYS) {
-    const value = storage.getItem(key)
+    const value = newer[key] ?? storage.getItem(key)
     if (value !== null) saved[key] = value
   }
   return toBase64Url(JSON.stringify(saved))

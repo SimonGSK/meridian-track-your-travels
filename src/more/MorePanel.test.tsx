@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import MorePanel, { type MoreId } from './MorePanel'
 import { BUNDLED_RATES } from '../data/money'
+import { DEFAULT_SETTINGS } from '../explore/useSettings'
 
 /** The panel, keeping what's open, and the currency chosen, as the app does */
 function Panel({ onPreview = vi.fn(), friend = null }: { onPreview?: () => void; friend?: string | null }) {
@@ -19,6 +20,8 @@ function Panel({ onPreview = vi.fn(), friend = null }: { onPreview?: () => void;
       friend={friend}
       compare={<p>the comparison</p>}
       onPreview={onPreview}
+      settings={DEFAULT_SETTINGS}
+      onSettingsChange={vi.fn()}
       currency={{ chosen, guess: 'DKK', onChoose: choose, rates: BUNDLED_RATES }}
     />
   )

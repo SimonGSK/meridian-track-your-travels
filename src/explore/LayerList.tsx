@@ -46,14 +46,6 @@ const LAYERS: Layer[] = [
   },
   { key: 'showFlights', label: 'Flights', description: "A line for each flight you've taken", dot: (theme) => ({ background: theme.flight }) },
   {
-    key: 'showScreensaverReplay',
-    label: 'Replay in screensaver',
-    description: 'The screensaver replays your trips every so often, oldest first, each place as it is reached, as it spins on',
-    // Played, as the replay is
-    dot: (theme) => ({ background: theme.flight, borderRadius: 0, clipPath: 'polygon(15% 0, 100% 50%, 15% 100%)' }),
-    under: 'showFlights',
-  },
-  {
     key: 'showFutureFlights',
     label: 'Future flights',
     description: 'The flights booked for trips to come, dashed',

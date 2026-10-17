@@ -561,6 +561,17 @@ describe('App', () => {
       expect(sidePanel()).toHaveAccessibleName('More') // Escape left the preview, not the panel
       expect(close).not.toHaveBeenCalled()
     })
+
+    it('replays your timeline unless switched off in its card, saved, and in the address at once', async () => {
+      render(<App />)
+      await openMore('Screensaver')
+      const address = () => (screen.getByRole('textbox', { name: 'Screensaver address' }) as HTMLInputElement).value
+      const before = address()
+      await userEvent.click(screen.getByRole('switch', { name: 'Replay timeline' }))
+      expect(screen.getByRole('switch', { name: 'Replay timeline' })).not.toBeChecked()
+      expect(JSON.parse(localStorage.getItem(SETTINGS_KEY)!)).toMatchObject({ showScreensaverReplay: false })
+      expect(address()).not.toBe(before)
+    })
   })
 
   describe('as a screensaver', () => {
