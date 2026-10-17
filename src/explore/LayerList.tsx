@@ -48,7 +48,7 @@ const LAYERS: Layer[] = [
   {
     key: 'showScreensaverReplay',
     label: 'Replay in screensaver',
-    description: 'The screensaver replays your trips every so often, oldest first, each place as it is reached',
+    description: 'The screensaver replays your trips every so often, oldest first, each place as it is reached, as it spins on',
     // Played, as the replay is
     dot: (theme) => ({ background: theme.flight, borderRadius: 0, clipPath: 'polygon(15% 0, 100% 50%, 15% 100%)' }),
     under: 'showFlights',

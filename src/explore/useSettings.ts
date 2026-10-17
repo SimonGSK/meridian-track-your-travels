@@ -16,7 +16,7 @@ export type Settings = {
   showCities: boolean
   /** Lines for the flights you've taken */
   showFlights: boolean
-  /** The screensaver replays your trips every so often, between spins, while the flights are shown */
+  /** The screensaver replays your trips every so often, as it spins, while the flights are shown */
   showScreensaverReplay: boolean
   /** The flights booked for trips to come, dashed */
   showFutureFlights: boolean
